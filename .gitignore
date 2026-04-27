@@ -17,3 +17,4 @@ restored_output/*
 !testdata/RealSR
 !testdata/RealSet128
 .idea
+/saved_logs
