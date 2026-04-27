@@ -108,7 +108,7 @@ Requires CUDA. Use `CUDA_VISIBLE_DEVICES=0` to restrict to a single GPU, which s
 **Single GPU:**
 ```bash
 # BCI
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining.yaml --save_dir ./saved_logs/BCI
+CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_bci.yaml --save_dir ./saved_logs/BCI
 
 # MIST — ER
 CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_mist_er.yaml --save_dir ./saved_logs/MIST_ER
