@@ -1,3 +1,4 @@
+import os
 import random
 import numpy as np
 from pathlib import Path
@@ -82,6 +83,8 @@ def create_dataset(dataset_config):
         dataset = BaseDataTxt(**dataset_config['params'])
     elif dataset_config['type'] == 'realesrgan':
         dataset = RealESRGANDataset(dataset_config['params'])
+    elif dataset_config['type'] == 'paired':
+        dataset = PairedStainDataset(**dataset_config['params'])
     else:
         raise NotImplementedError(dataset_config['type'])
 
@@ -398,4 +401,55 @@ class BicubicData(Dataset):
         if self.need_path:
             out['path'] = im_path
 
+        return out
+
+class PairedStainDataset(Dataset):
+    """Paired HE/IHC dataset for virtual staining (no degradation)."""
+    EXTS = {'png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff'}
+
+    def __init__(self, he_path, ihc_path, gt_size=256, split='train', mean=0.5, std=0.5, need_path=False):
+        he_files  = sorted(f for f in os.listdir(he_path)  if Path(f).suffix.lower().lstrip('.') in self.EXTS)
+        ihc_files = sorted(f for f in os.listdir(ihc_path) if Path(f).suffix.lower().lstrip('.') in self.EXTS)
+        assert he_files == ihc_files, "HE and IHC folders must contain files with identical names"
+
+        self.he_paths  = [os.path.join(he_path,  f) for f in he_files]
+        self.ihc_paths = [os.path.join(ihc_path, f) for f in ihc_files]
+        self.gt_size   = gt_size
+        self.split     = split
+        self.mean      = mean
+        self.std       = std
+        self.need_path = need_path
+
+    def __len__(self):
+        return len(self.he_paths)
+
+    def __getitem__(self, index):
+        im_he  = util_image.imread(self.he_paths[index],  chn='rgb', dtype='float32')
+        im_ihc = util_image.imread(self.ihc_paths[index], chn='rgb', dtype='float32')
+
+        # synchronized crop from identical position
+        h, w = im_he.shape[:2]
+        if h < self.gt_size or w < self.gt_size:
+            pad_h = max(0, self.gt_size - h)
+            pad_w = max(0, self.gt_size - w)
+            im_he  = cv2.copyMakeBorder(im_he,  0, pad_h, 0, pad_w, cv2.BORDER_REFLECT_101)
+            im_ihc = cv2.copyMakeBorder(im_ihc, 0, pad_h, 0, pad_w, cv2.BORDER_REFLECT_101)
+
+        h, w = im_he.shape[:2]
+        top  = random.randint(0, h - self.gt_size)
+        left = random.randint(0, w - self.gt_size)
+        im_he  = im_he [top:top+self.gt_size, left:left+self.gt_size]
+        im_ihc = im_ihc[top:top+self.gt_size, left:left+self.gt_size]
+
+        if self.split == 'train':
+            aug_mode = random.randint(0, 7)
+            im_he  = util_image.data_aug_np(im_he,  aug_mode)
+            im_ihc = util_image.data_aug_np(im_ihc, aug_mode)
+
+        im_he  = torch.from_numpy((im_he  - self.mean) / self.std).float().permute(2, 0, 1)
+        im_ihc = torch.from_numpy((im_ihc - self.mean) / self.std).float().permute(2, 0, 1)
+
+        out = {'lq': im_he, 'gt': im_ihc}
+        if self.need_path:
+            out['path'] = self.he_paths[index]
         return out

@@ -817,9 +817,10 @@ class TrainerDifIR(TrainerBase):
 
                 with torch.no_grad():
                     results = sample_decode['sample'].detach()
-                    mean_clipiqa += self.metric_dict["clipiqa"](results.detach() * 0.5 + 0.5).sum().item()
-                    mean_musiq += self.metric_dict["musiq"](results.detach() * 0.5 + 0.5).sum().item()
-                    
+                    iqa_input = (results.detach() * 0.5 + 0.5).clamp(0, 1)
+                    mean_clipiqa += self.metric_dict["clipiqa"](iqa_input).sum().item()
+                    mean_musiq += self.metric_dict["musiq"](iqa_input).sum().item()
+
                 if 'gt' in data:
                     mean_psnr += util_image.batch_PSNR(
                             sample_decode['sample'].detach() * 0.5 + 0.5,
@@ -1217,8 +1218,9 @@ class TrainerDistillDifIR(TrainerDifIR):
                             )
                     mean_lpips += self.lpips_loss(results.detach(), im_gt).sum().item()
                 with torch.no_grad():
-                    mean_clipiqa += self.metric_dict["clipiqa"](results.detach() * 0.5 + 0.5).sum().item()
-                    mean_musiq += self.metric_dict["musiq"](results.detach() * 0.5 + 0.5).sum().item()
+                    iqa_input = (results.detach() * 0.5 + 0.5).clamp(0, 1)
+                    mean_clipiqa += self.metric_dict["clipiqa"](iqa_input).sum().item()
+                    mean_musiq += self.metric_dict["musiq"](iqa_input).sum().item()
                 if (ii + 1) % self.configs.train.log_freq[2] == 0:
                     self.logger.info(f'Validation: {ii+1:02d}/{num_iters_epoch:02d}...')
 

@@ -593,9 +593,11 @@ class GaussianDiffusion:
         """
         if device is None:
             device = next(model.parameters()).device
-        z_y = self.encode_first_stage(y, first_stage_model, up_sample=True) 
-        z_x = self.encode_first_stage(x, first_stage_model, up_sample=False) 
-    
+        z_y = self.encode_first_stage(y, first_stage_model, up_sample=True)
+        z_x = self.encode_first_stage(x, first_stage_model, up_sample=False)
+        if model_kwargs is not None and 'lq' in model_kwargs and model_kwargs['lq'].shape[2:] != z_y.shape[2:]:
+            model_kwargs = {**model_kwargs, 'lq': z_y}
+
         indices = list(range(1, self.num_timesteps))
         z_sample = z_x
         
@@ -638,6 +640,8 @@ class GaussianDiffusion:
         if device is None:
             device = next(model.parameters()).device
         z_y = self.encode_first_stage(y, first_stage_model, up_sample=True)
+        if model_kwargs is not None and 'lq' in model_kwargs and model_kwargs['lq'].shape[2:] != z_y.shape[2:]:
+            model_kwargs = {**model_kwargs, 'lq': z_y}
 
         # generating noise
         if noise is None:
@@ -742,6 +746,8 @@ class GaussianDiffusion:
             model_kwargs = {}
             
         z_y = self.encode_first_stage(y, first_stage_model, up_sample=True) # TODO can be eliminated to speed up, since z_y is already obtained in self.ddim_sample_loop/p_sample_loop
+        if model_kwargs is not None and 'lq' in model_kwargs and model_kwargs['lq'].shape[2:] != z_y.shape[2:]:
+            model_kwargs = {**model_kwargs, 'lq': z_y}
         if noise is None:
             noise = th.randn_like(z_y)
         
@@ -1077,7 +1083,9 @@ class GaussianDiffusion:
         if device is None:
             device = next(model.parameters()).device
         z_y = self.encode_first_stage(y, first_stage_model, up_sample=True)
-    
+        if model_kwargs is not None and 'lq' in model_kwargs and model_kwargs['lq'].shape[2:] != z_y.shape[2:]:
+            model_kwargs = {**model_kwargs, 'lq': z_y}
+
         if zT is None:
             z_sample = self.prior_sample(z_y, noise)
         else:
