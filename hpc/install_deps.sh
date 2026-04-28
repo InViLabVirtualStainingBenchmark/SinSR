@@ -66,6 +66,7 @@ python -m pip install \
     pyiqa \
     scikit-image \
     tqdm \
+    albumentations \
     --no-cache-dir \
     --no-build-isolation
 
