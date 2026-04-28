@@ -14,7 +14,7 @@ model:
     num_res_blocks: [2, 2, 2, 2]
     conv_resample: True
     dims: 2
-    use_fp16: False
+    use_fp16: True
     num_head_channels: 32
     use_scale_shift_norm: True
     resblock_updown: False
@@ -44,7 +44,7 @@ diffusion:
 autoencoder:
   target: ldm.models.autoencoder.VQModelTorch
   ckpt_path: weights/autoencoder_vq_f4.pth
-  use_fp16: False
+  use_fp16: True
   params:
     embed_dim: 3
     n_embed: 8192
@@ -68,49 +68,40 @@ data:
   train:
     type: paired
     params:
-      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainA"
-      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainB"
+      he_path: /scratch/antwerpen/212/vsc21211/sinsr/mist_Ki67/train/input
+      ihc_path: /scratch/antwerpen/212/vsc21211/sinsr/mist_Ki67/train/target
       gt_size: 256
       split: train
-  val:
-    type: paired
-    params:
-      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainA"
-      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainB"
-      gt_size: 256
-      split: val
-      mean: 0.5
-      std: 0.5
       mean: 0.5
       std: 0.5
   val:
     type: paired
     params:
-      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainA"
-      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/KI67/TrainValAB/trainB"
+      he_path: /scratch/antwerpen/212/vsc21211/sinsr/mist_Ki67/val/input
+      ihc_path: /scratch/antwerpen/212/vsc21211/sinsr/mist_Ki67/val/target
       gt_size: 256
       split: val
       mean: 0.5
       std: 0.5
 
 train:
-  learn_xT: True
+  learn_xT: False
   finetune_use_gt: 1.
 
   lr: 5e-5
   batch: [4, 4]
-  use_fp16: False
+  use_fp16: True
   microbatch: 4
   seed: 123456
   global_seeding: False
   prefetch_factor: 4
   num_workers: 4
   ema_rate: 0.999
-  iterations: 4
-  milestones: [2, 4]
+  iterations: 1038
+  milestones: [100, 1038]
   weight_decay: 0
-  save_freq: 4
-  val_freq: 4
-  log_freq: [2, 4, 1]
+  save_freq: 1038
+  val_freq: 1038
+  log_freq: [50, 1038, 1]
   save_images: True
   use_ema_val: True
