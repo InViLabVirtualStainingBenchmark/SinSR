@@ -68,17 +68,26 @@ data:
   train:
     type: paired
     params:
-      he_path: traindata/MIST/ER/train/he
-      ihc_path: traindata/MIST/ER/train/ihc
+      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainA"
+      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainB"
       gt_size: 256
       split: train
+  val:
+    type: paired
+    params:
+      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainA"
+      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainB"
+      gt_size: 256
+      split: val
+      mean: 0.5
+      std: 0.5
       mean: 0.5
       std: 0.5
   val:
     type: paired
     params:
-      he_path: traindata/MIST/ER/val/he
-      ihc_path: traindata/MIST/ER/val/ihc
+      he_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainA"
+      ihc_path: "/home/vs_user/Virtual Staining/Datasets/MIST/ER/TrainValAB/trainB"
       gt_size: 256
       split: val
       mean: 0.5

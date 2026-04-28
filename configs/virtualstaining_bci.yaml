@@ -68,8 +68,8 @@ data:
   train:
     type: paired
     params:
-      he_path: traindata/BCI/train/he
-      ihc_path: traindata/BCI/train/ihc
+      he_path: "/home/vs_user/Virtual Staining/Datasets/BCI/HE/train"
+      ihc_path: "/home/vs_user/Virtual Staining/Datasets/BCI/IHC/train"
       gt_size: 256
       split: train
       mean: 0.5
@@ -77,8 +77,8 @@ data:
   val:
     type: paired
     params:
-      he_path: traindata/BCI/val/he
-      ihc_path: traindata/BCI/val/ihc
+      he_path: "/home/vs_user/Virtual Staining/Datasets/BCI/HE/test"
+      ihc_path: "/home/vs_user/Virtual Staining/Datasets/BCI/IHC/test"
       gt_size: 256
       split: val
       mean: 0.5
@@ -97,11 +97,11 @@ train:
   prefetch_factor: 4
   num_workers: 4
   ema_rate: 0.999
-  iterations: 4
-  milestones: [2, 4]
+  iterations: 1948
+  milestones: [500, 1948]
   weight_decay: 0
-  save_freq: 4
-  val_freq: 4
-  log_freq: [2, 4, 1]
+  save_freq: 974
+  val_freq: 974
+  log_freq: [100, 974, 1]
   save_images: True
   use_ema_val: True
