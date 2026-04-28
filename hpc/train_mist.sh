@@ -69,7 +69,7 @@ for stain in ER HER2 Ki67 PR; do
 
     stain_lower=$(echo "$stain" | tr '[:upper:]' '[:lower:]')
     CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
-    DATA_ROOT="$VSC_SCRATCH/sinsr/mist_${stain}"
+    DATA_ROOT="$VSC_SCRATCH/datasets/MIST/$stain/TrainValAB"
     SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run1"
     # Where checkpoints, logs, and sample images will be saved.
     # Change the suffix for each new run to avoid overwriting.
@@ -85,18 +85,16 @@ for stain in ER HER2 Ki67 PR; do
         deactivate; exit 1
     fi
 
-    for split in train val; do
-        for domain in input target; do
-            if [ ! -d "$DATA_ROOT/$split/$domain" ]; then
-                echo "ERROR: Missing dataset folder: $DATA_ROOT/$split/$domain"
-                kill $GPU_LOG_PID 2>/dev/null || true
-                deactivate; exit 1
-            fi
-        done
+    for dir in "$DATA_ROOT/trainA" "$DATA_ROOT/trainB" "$DATA_ROOT/valA" "$DATA_ROOT/valB"; do
+        if [ ! -d "$dir" ]; then
+            echo "ERROR: Missing dataset folder: $dir"
+            kill $GPU_LOG_PID 2>/dev/null || true
+            deactivate; exit 1
+        fi
     done
 
-    echo "Training images : $(find "$DATA_ROOT/train/input" -maxdepth 1 \( -type f -o -type l \) | wc -l)"
-    echo "Validation images: $(find "$DATA_ROOT/val/input" -maxdepth 1 \( -type f -o -type l \) | wc -l)"
+    echo "Training images : $(find "$DATA_ROOT/trainA" -maxdepth 1 -type f | wc -l)"
+    echo "Validation images: $(find "$DATA_ROOT/valA" -maxdepth 1 -type f | wc -l)"
     echo "Config  : $CONFIG"
     echo "Save    : $SAVE_DIR"
 

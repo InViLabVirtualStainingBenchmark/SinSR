@@ -68,8 +68,8 @@ data:
   train:
     type: paired
     params:
-      he_path: /scratch/antwerpen/212/vsc21211/sinsr/bci/train/input
-      ihc_path: /scratch/antwerpen/212/vsc21211/sinsr/bci/train/target
+      he_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/HE/train
+      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/IHC/train
       gt_size: 256
       split: train
       mean: 0.5
@@ -77,8 +77,8 @@ data:
   val:
     type: paired
     params:
-      he_path: /scratch/antwerpen/212/vsc21211/sinsr/bci/val/input
-      ihc_path: /scratch/antwerpen/212/vsc21211/sinsr/bci/val/target
+      he_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/HE/test
+      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/IHC/test
       gt_size: 256
       split: val
       mean: 0.5

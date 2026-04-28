@@ -13,8 +13,8 @@ echo "Cloning SinSR into: $REPO_DIR"
 
 # Skip clone if repo already exists
 if [ -d "$REPO_DIR/.git" ]; then
-    echo "Repo already exists — skipping clone."
-    echo "To re-clone: rm -rf $REPO_DIR and rerun this script."
+    echo "Repo already exists — pulling latest changes."
+    git -C "$REPO_DIR" pull
 else
     cd "$BASE_DIR/code"
     git clone https://github.com/InViLabVirtualStainingBenchmark/SinSR.git

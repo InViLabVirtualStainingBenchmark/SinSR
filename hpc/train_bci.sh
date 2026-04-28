@@ -21,7 +21,7 @@ REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
 # Root folder of the SinSR repository
 
 CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
-DATA_ROOT="$VSC_SCRATCH/sinsr/bci"
+DATA_ROOT="$VSC_SCRATCH/datasets/BCI"
 SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run1"
 # Where checkpoints, logs, and sample images will be saved.
 # Change the suffix for each new run to avoid overwriting.
@@ -65,17 +65,15 @@ if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || [ ! -f "$REPO_DI
 fi
 
 echo "Checking dataset..."
-for split in train val; do
-    for domain in input target; do
-        if [ ! -d "$DATA_ROOT/$split/$domain" ]; then
-            echo "ERROR: Missing dataset folder: $DATA_ROOT/$split/$domain"
-            deactivate; exit 1
-        fi
-    done
+for dir in "$DATA_ROOT/HE/train" "$DATA_ROOT/HE/test" "$DATA_ROOT/IHC/train" "$DATA_ROOT/IHC/test"; do
+    if [ ! -d "$dir" ]; then
+        echo "ERROR: Missing dataset folder: $dir"
+        deactivate; exit 1
+    fi
 done
 
-echo "Training images : $(find "$DATA_ROOT/train/input" -maxdepth 1 \( -type f -o -type l \) | wc -l)"
-echo "Validation images: $(find "$DATA_ROOT/val/input" -maxdepth 1 \( -type f -o -type l \) | wc -l)"
+echo "Training images : $(find "$DATA_ROOT/HE/train" -maxdepth 1 -type f | wc -l)"
+echo "Validation images: $(find "$DATA_ROOT/HE/test" -maxdepth 1 -type f | wc -l)"
 
 python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 
