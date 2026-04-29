@@ -2,7 +2,7 @@
 #SBATCH --job-name=sinsr_mist
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=4:00:00
 #SBATCH -A ap_invilab_td_thesis
