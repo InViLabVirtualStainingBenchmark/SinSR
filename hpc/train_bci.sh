@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
-#SBATCH --time=2:00:00
+#SBATCH --time=20:00:00
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
@@ -93,7 +93,7 @@ nvidia-smi --query-gpu=timestamp,index,utilization.gpu,utilization.memory,memory
            --format=csv -l 5 > "$VSC_DATA/projects/sinsr/logs/gpu_bci_${SLURM_JOB_ID}.csv" &
 GPU_LOG_PID=$!
 
-CUDA_VISIBLE_DEVICES=0 python main_distill.py \
+python main_distill.py \
     --cfg_path "$CONFIG" \
     --save_dir "$SAVE_DIR"
 
