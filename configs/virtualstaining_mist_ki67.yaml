@@ -97,11 +97,11 @@ train:
   prefetch_factor: 4
   num_workers: 4
   ema_rate: 0.999
-  iterations: 1038
-  milestones: [100, 1038]
+  iterations: 260
+  milestones: [26, 260]
   weight_decay: 0
-  save_freq: 1038
-  val_freq: 1038
-  log_freq: [50, 1038, 1]
+  save_freq: 260
+  val_freq: 260
+  log_freq: [13, 260, 1]
   save_images: True
   use_ema_val: True
