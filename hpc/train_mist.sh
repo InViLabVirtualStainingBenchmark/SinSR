@@ -70,9 +70,8 @@ for stain in ER HER2 Ki67 PR; do
     stain_lower=$(echo "$stain" | tr '[:upper:]' '[:lower:]')
     CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
     DATA_ROOT="$VSC_SCRATCH/datasets/MIST/$stain/TrainValAB"
-    SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run1"
-    # Where checkpoints, logs, and sample images will be saved.
-    # Change the suffix for each new run to avoid overwriting.
+    SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run"
+    # Trainer automatically creates a timestamped subfolder inside this directory.
 
     echo ""
     echo "========================================="

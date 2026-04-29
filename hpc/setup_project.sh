@@ -11,7 +11,7 @@ BASE_DIR="$VSC_DATA/projects/sinsr"
 echo "Creating project structure at: $BASE_DIR"
 
 # Main folders
-mkdir -p "$BASE_DIR"/{code,data,logs,outputs,jobs}
+mkdir -p "$BASE_DIR"/{code,logs,outputs,jobs}
 # code      → cloned repos
 # logs      → slurm outputs
 # outputs   → model outputs

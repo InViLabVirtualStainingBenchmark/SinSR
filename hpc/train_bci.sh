@@ -22,9 +22,8 @@ REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
 
 CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
 DATA_ROOT="$VSC_SCRATCH/datasets/BCI"
-SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run1"
-# Where checkpoints, logs, and sample images will be saved.
-# Change the suffix for each new run to avoid overwriting.
+SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
+# Trainer automatically creates a timestamped subfolder inside this directory.
 
 # =========================================================
 # ENVIRONMENT
