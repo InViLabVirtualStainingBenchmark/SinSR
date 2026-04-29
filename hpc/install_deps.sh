@@ -86,6 +86,7 @@ python -c "import loguru; print('loguru OK')"
 python -c "import cv2; print('cv2:', cv2.__version__)"
 python -c "import skimage; print('skimage OK')"
 python -c "import tqdm; print('tqdm OK')"
+python -c "import albumentations; print('albumentations OK')"
 
 deactivate
 
