@@ -8,7 +8,7 @@ Changes made to the original SinSR repository to support paired HE→IHC virtual
 
 | File | Dataset | Marker |
 |---|---|---|
-| `configs/virtualstaining.yaml` | BCI | — |
+| `configs/virtualstaining_bci.yaml` | BCI | — |
 | `configs/virtualstaining_mist_er.yaml` | MIST | ER |
 | `configs/virtualstaining_mist_her2.yaml` | MIST | HER2 |
 | `configs/virtualstaining_mist_ki67.yaml` | MIST | Ki67 |
@@ -23,9 +23,15 @@ Key changes from the original `configs/SinSR.yaml`:
 | `data.val.type` | `folder` | `paired` |
 | `data.*.params` | RealESRGAN paths | `he_path` / `ihc_path` per dataset |
 | `autoencoder.use_fp16` | `True` | `False` |
-| `train.batch` | `[64, 8]` | `[4, 4]` |
-| `train.iterations` | `500000` | `4` (smoke test) |
-| `train.log_freq` | `[200, 5000, 1]` | `[2, 4, 1]` |
+| `train.learn_xT` | `True` | `False` |
+| `train.batch` | `[64, 8]` | `[16, 16]` |
+| `train.microbatch` | `64` | `16` |
+| `train.num_workers` | `16` | `8` |
+| `train.prefetch_factor` | `4` | `8` |
+
+`autoencoder.use_fp16` is disabled — validation crashed with a mixed-precision error (`Input type (Half) and bias type (float) should be the same`). The exact source was not isolated so all fp16 flags were set to False.
+
+`learn_xT: False` — the teacher was trained on super-resolution degradations, so its noise predictions are incompatible with the HE→IHC domain.
 
 The `degradation` block was removed — virtual staining uses real paired images, no synthetic degradation needed.
 
@@ -35,7 +41,7 @@ The `degradation` block was removed — virtual staining uses real paired images
 
 New dataset class for loading matched HE and IHC image pairs. Registered in `create_dataset()` under type `paired`.
 
-- Filenames in `he/` and `ihc/` must match exactly
+- Filenames in `he_path` and `ihc_path` must match exactly
 - Crop coordinates and augmentation are synchronized between HE and IHC
 - Augmentation is only applied during training
 
@@ -68,57 +74,81 @@ iqa_input = (results.detach() * 0.5 + 0.5).clamp(0, 1)
 
 ## 5. Training Data Structure
 
+Images must be at least 256×256. Filenames must match between HE and IHC folders.
+
+**Local:**
 ```
 traindata/
     BCI/
-        train/he/   train/ihc/
-        val/he/     val/ihc/
-    MIST/
-        ER/   train/he/  train/ihc/  val/he/  val/ihc/
-        HER2/ ...
-        Ki67/ ...
-        PR/   ...
+        train/he/    train/ihc/
+        val/he/      val/ihc/
 ```
 
-Images must be at least 256×256. Filenames must match between `he/` and `ihc/` folders.
+**Cluster** — configs point directly to the source dataset paths, no preparation step needed:
+```
+$VSC_SCRATCH/datasets/
+    BCI/
+        HE/train/    HE/test/
+        IHC/train/   IHC/test/
+    MIST/
+        ER/TrainValAB/trainA   trainB   valA   valB
+        HER2/TrainValAB/...
+        Ki67/TrainValAB/...
+        PR/TrainValAB/...
+```
 
 ---
 
 ## 6. Model Weights
 
-Required weights (not included in the repo):
+Required weights (not included in the repo). Download and place them in the `weights/` folder under the project root.
 
 | File | Purpose |
 |---|---|
 | `weights/resshift_realsrx4_s15_v1.pth` | Teacher model for distillation |
 | `weights/autoencoder_vq_f4.pth` | VQ-VAE encoder/decoder |
 
-Download by running inference once — weights are fetched automatically from GitHub releases:
+| File | Download |
+|---|---|
+| `weights/resshift_realsrx4_s15_v1.pth` | https://github.com/wyf0912/SinSR/releases/download/v1.0/resshift_realsrx4_s15_v1.pth |
+| `weights/autoencoder_vq_f4.pth` | https://github.com/zsyOAOA/ResShift/releases/download/v2.0/autoencoder_vq_f4.pth |
+
+You can also download by running inference once — weights are fetched automatically from GitHub releases:
 
 ```bash
 python inference.py --task realsrx4 -i testdata/RealSet65/00003.png -o ./results --scale 4
 ```
 
+
 ---
 
-## Running
+## 7. HPC Scripts
 
-Requires CUDA. Use `CUDA_VISIBLE_DEVICES=0` to restrict to a single GPU, which skips the distributed setup.
+Scripts in `hpc/` for running on the VSC cluster.
 
-**Single GPU:**
+| Script | How to run | Purpose |
+|---|---|---|
+| `setup_project.sh` | `bash setup_project.sh` | Create project folder structure |
+| `clone_repo.sh` | `bash clone_repo.sh` | Clone the repository |
+| `install_deps.sh` | `sbatch install_deps.sh` | Create venv and install dependencies |
+| `train_bci.sh` | `sbatch train_bci.sh` | Train on BCI dataset |
+| `train_mist.sh` | `sbatch train_mist.sh` | Train on all four MIST stains sequentially |
+
+`setup_project.sh` and `clone_repo.sh` must be run manually on the login node. They also have copies in `~/` on the cluster since they are needed before the repo is cloned. The remaining three are submitted as SLURM jobs.
+
+Checkpoints and sample images are saved under `$VSC_DATA/projects/sinsr/outputs/`. SLURM and GPU logs are saved under `$VSC_DATA/projects/sinsr/logs/`.
+
+---
+
+## 8. Running
+
+**On cluster:**
 ```bash
-# BCI
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_bci.yaml --save_dir ./saved_logs/BCI
+sbatch hpc/train_bci.sh
+sbatch hpc/train_mist.sh
+```
 
-# MIST — ER
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_mist_er.yaml --save_dir ./saved_logs/MIST_ER
-
-# MIST — HER2
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_mist_her2.yaml --save_dir ./saved_logs/MIST_HER2
-
-# MIST — Ki67
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_mist_ki67.yaml --save_dir ./saved_logs/MIST_Ki67
-
-# MIST — PR
-CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_mist_pr.yaml --save_dir ./saved_logs/MIST_PR
+**Local single GPU:**
+```bash
+CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_bci.yaml --save_dir ./outputs/bci_run
 ```
