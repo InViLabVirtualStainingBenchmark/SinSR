@@ -89,19 +89,19 @@ train:
   finetune_use_gt: 1.
 
   lr: 5e-5
-  batch: [4, 4]
+  batch: [16, 16]
   use_fp16: False
-  microbatch: 4
+  microbatch: 16
   seed: 123456
   global_seeding: False
-  prefetch_factor: 4
-  num_workers: 4
+  prefetch_factor: 8
+  num_workers: 8
   ema_rate: 0.999
-  iterations: 260
-  milestones: [26, 260]
+  iterations: 65
+  milestones: [65, 65]
   weight_decay: 0
-  save_freq: 260
-  val_freq: 260
-  log_freq: [13, 260, 1]
+  save_freq: 65
+  val_freq: 65
+  log_freq: [13, 65, 1]
   save_images: True
   use_ema_val: True
