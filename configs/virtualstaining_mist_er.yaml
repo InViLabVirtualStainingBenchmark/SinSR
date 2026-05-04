@@ -97,8 +97,8 @@ train:
   prefetch_factor: 8
   num_workers: 8
   ema_rate: 0.999
-  iterations: 65
-  milestones: [65, 65]
+  iterations: 6500
+  milestones: [65, 6500]
   weight_decay: 0
   save_freq: 65
   val_freq: 65
