@@ -103,5 +103,5 @@ train:
   save_freq: 65
   val_freq: 65
   log_freq: [13, 65, 1]
-  save_images: True
+  save_images: False
   use_ema_val: True

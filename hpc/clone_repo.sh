@@ -21,4 +21,4 @@ else
 fi
 
 echo ""
-echo "Done. Next: sbatch install_deps.sh"
+echo "Done."
