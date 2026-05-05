@@ -22,6 +22,11 @@ export CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
 export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
 export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 
+# Set to a checkpoint .pth path to resume, e.g.:
+#   export RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run/2026-05-04-14-23/ckpts/model_5124.pth"
+# Leave empty for a fresh run.
+export RESUME=""
+
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_sinsr_bci.sh"
 

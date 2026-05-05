@@ -18,11 +18,18 @@ echo ""
 echo "Starting BCI training..."
 echo "  config : $CONFIG"
 echo "  save   : $SAVE_DIR"
+echo "  resume : ${RESUME:-none}"
 
 cd "$REPO_DIR"
+RESUME_ARG=""
+if [ -n "${RESUME:-}" ]; then
+    RESUME_ARG="--resume $RESUME"
+fi
+
 python3 main_distill.py \
     --cfg_path "$CONFIG" \
-    --save_dir "$SAVE_DIR"
+    --save_dir "$SAVE_DIR" \
+    $RESUME_ARG
 
 kill $GPU_LOG_PID 2>/dev/null || true
 

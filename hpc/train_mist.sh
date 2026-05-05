@@ -8,8 +8,8 @@
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/train_mist.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/train_mist.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.err
 
 set -euo pipefail
 
@@ -22,6 +22,21 @@ export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_sinsr_mist.sh"
+
+# Stain to train: ER | HER2 | Ki67 | PR
+# Override at submission with: sbatch --export=ALL,STAIN=HER2 train_mist.sh
+: "${STAIN:=ER}"
+
+stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
+
+export STAIN
+export CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
+export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run"
+
+# Set to a checkpoint .pth path to resume, e.g.:
+#   export RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/2026-05-04-14-19/ckpts/model_65.pth"
+# Leave empty for a fresh run.
+export RESUME=""
 
 # =========================================================
 # ENVIRONMENT
@@ -55,35 +70,21 @@ if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || \
     exit 1
 fi
 
+echo "=== Stain: $STAIN ==="
+if [ ! -f "$CONFIG" ]; then
+    echo "ERROR: Config not found at $CONFIG"
+    exit 1
+fi
+
 # =========================================================
-# TRAINING — ALL FOUR MIST STAINS
+# RUN
 # =========================================================
 
-for stain in ER HER2 Ki67 PR; do
-
-    stain_lower=$(echo "$stain" | tr '[:upper:]' '[:lower:]')
-
-    export STAIN="$stain"
-    export CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
-    export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run"
-
-    echo ""
-    echo "========================================="
-    echo "  Stain: $stain"
-    echo "========================================="
-
-    if [ ! -f "$CONFIG" ]; then
-        echo "ERROR: Config not found at $CONFIG"
-        exit 1
-    fi
-
-    srun apptainer exec --nv \
-        -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
-        -B "$VSC_DATA:$VSC_DATA" \
-        "$CONTAINER" \
-        bash "$RUN_SCRIPT"
-
-done
+srun apptainer exec --nv \
+    -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
+    -B "$VSC_DATA:$VSC_DATA" \
+    "$CONTAINER" \
+    bash "$RUN_SCRIPT"
 
 echo ""
-echo "All MIST stains complete."
+echo "MIST $STAIN training complete."
