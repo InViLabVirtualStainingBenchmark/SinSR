@@ -115,15 +115,12 @@ def main():
             chop_size=args.chop_size,
             chop_stride=chop_stride,
             chop_bs=1,
-            use_fp16=True,
+            use_fp16=False,
             seed=args.seed,
             ddim=args.ddim
             )
 
     resshift_sampler.inference(args.in_path, args.out_path, bs=1, noise_repeat=False, one_step=args.one_step)
-    import evaluate
-    evaluate.evaluate(args.out_path, args.ref_path, None)
-    
-    
+
 if __name__ == '__main__':
     main()
