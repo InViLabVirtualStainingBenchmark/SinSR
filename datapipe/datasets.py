@@ -407,10 +407,19 @@ class PairedStainDataset(Dataset):
     """Paired HE/IHC dataset for virtual staining (no degradation)."""
     EXTS = {'png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff'}
 
-    def __init__(self, he_path, ihc_path, gt_size=256, split='train', mean=0.5, std=0.5, need_path=False):
+    def __init__(self, he_path, ihc_path, gt_size=256, split='train', mean=0.5, std=0.5, need_path=False, val_ratio=0.0):
         he_files  = sorted(f for f in os.listdir(he_path)  if Path(f).suffix.lower().lstrip('.') in self.EXTS)
         ihc_files = sorted(f for f in os.listdir(ihc_path) if Path(f).suffix.lower().lstrip('.') in self.EXTS)
         assert he_files == ihc_files, "HE and IHC folders must contain files with identical names"
+
+        if val_ratio > 0.0:
+            n_val = max(1, int(len(he_files) * val_ratio))
+            if split == 'val':
+                he_files  = he_files[-n_val:]
+                ihc_files = ihc_files[-n_val:]
+            else:
+                he_files  = he_files[:-n_val]
+                ihc_files = ihc_files[:-n_val]
 
         self.he_paths  = [os.path.join(he_path,  f) for f in he_files]
         self.ihc_paths = [os.path.join(ihc_path, f) for f in ihc_files]

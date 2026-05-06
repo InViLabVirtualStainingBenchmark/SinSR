@@ -44,7 +44,7 @@ diffusion:
 autoencoder:
   target: ldm.models.autoencoder.VQModelTorch
   ckpt_path: weights/autoencoder_vq_f4.pth
-  use_fp16: False
+  use_fp16: True
   params:
     embed_dim: 3
     n_embed: 8192
@@ -72,15 +72,17 @@ data:
       ihc_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/IHC/train
       gt_size: 256
       split: train
+      val_ratio: 0.1
       mean: 0.5
       std: 0.5
   val:
     type: paired
     params:
-      he_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/HE/test
-      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/IHC/test
+      he_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/HE/train
+      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/BCI/IHC/train
       gt_size: 256
       split: val
+      val_ratio: 0.1
       mean: 0.5
       std: 0.5
 
@@ -89,19 +91,19 @@ train:
   finetune_use_gt: 1.
 
   lr: 5e-5
-  batch: [16, 16]
+  batch: [64, 8]
   use_fp16: False
-  microbatch: 16
+  microbatch: 64
   seed: 123456
   global_seeding: False
-  prefetch_factor: 8
-  num_workers: 8
+  prefetch_factor: 4
+  num_workers: 16
   ema_rate: 0.999
-  iterations: 24400
-  milestones: [244, 24400]
+  iterations: 500000
+  milestones: [5000, 50000]
   weight_decay: 0
   save_freq: 2440
   val_freq: 244
-  log_freq: [12, 244, 1]
+  log_freq: [200, 5000, 1]
   save_images: False
   use_ema_val: True
