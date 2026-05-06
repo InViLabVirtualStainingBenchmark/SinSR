@@ -1,28 +1,28 @@
 #!/bin/bash
-#SBATCH --job-name=sinsr_infer_bci
+#SBATCH --job-name=sinsr_infer_mist
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
 #SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.out
 #SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.err
 
-# infer_bci.sh — BCI test inference. Submit after train_bci.sh completes.
-# Automatically picks the most recent training run and its highest-iteration EMA checkpoint.
+# infer_mist.sh — MIST inference for all four stains. Submit after train_mist.sh completes.
+# Automatically picks the most recent training run and its highest-iteration EMA checkpoint per stain.
 
 set -euo pipefail
 
 export REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
 export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
-export OUT_DIR="$VSC_DATA/projects/sinsr/outputs/results/bci_test"
-export CKPT_BASE="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
+export CKPT_BASE="$VSC_DATA/projects/sinsr/outputs/checkpoints"
+export OUT_BASE="$VSC_DATA/projects/sinsr/outputs/results"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
-RUN_SCRIPT="$REPO_DIR/hpc/run_infer_bci.sh"
+RUN_SCRIPT="$REPO_DIR/hpc/run_infer_mist.sh"
 
 # =========================================================
 # ENVIRONMENT
@@ -43,11 +43,11 @@ fi
 echo "  $CONTAINER"
 
 echo "=== Checking dataset ==="
-if [ ! -f "$VSC_SCRATCH/datasets/BCI.sqsh" ]; then
-    echo "ERROR: BCI SquashFS archive not found: $VSC_SCRATCH/datasets/BCI.sqsh"
+if [ ! -f "$VSC_SCRATCH/datasets/MIST.sqsh" ]; then
+    echo "ERROR: MIST SquashFS archive not found: $VSC_SCRATCH/datasets/MIST.sqsh"
     exit 1
 fi
-echo "  BCI.sqsh : $(du -h "$VSC_SCRATCH/datasets/BCI.sqsh" | cut -f1)"
+echo "  MIST.sqsh : $(du -h "$VSC_SCRATCH/datasets/MIST.sqsh" | cut -f1)"
 
 echo "=== Checking weights ==="
   if [ ! -f "$REPO_DIR/weights/autoencoder_vq_f4.pth" ]; then
@@ -59,14 +59,13 @@ echo "=== Checking weights ==="
 # RUN
 # =========================================================
 
-mkdir -p "$VSC_SCRATCH/datasets/BCI"
-mkdir -p "$OUT_DIR"
+mkdir -p "$VSC_SCRATCH/datasets/MIST"
 
 srun apptainer exec --nv \
-    -B "$VSC_SCRATCH/datasets/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
+    -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     "$CONTAINER" \
     bash "$RUN_SCRIPT"
 
 echo ""
-echo "BCI inference complete."
+echo "All MIST stains inference complete."

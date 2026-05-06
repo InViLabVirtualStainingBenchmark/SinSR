@@ -80,6 +80,8 @@ fi
 # RUN
 # =========================================================
 
+mkdir -p "$VSC_SCRATCH/datasets/MIST"
+
 srun apptainer exec --nv \
     -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \

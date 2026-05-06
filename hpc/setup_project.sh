@@ -11,18 +11,18 @@ BASE_DIR="$VSC_DATA/projects/sinsr"
 echo "Creating project structure at: $BASE_DIR"
 
 # Main folders
-mkdir -p "$BASE_DIR"/{code,logs,outputs,jobs}
-# code      → cloned repos
-# logs      → slurm outputs
-# outputs   → model outputs
-# jobs      → slurm scripts
+mkdir -p "$BASE_DIR"/{code,logs,outputs}
+# code    → cloned repos
+# logs    → slurm outputs
+# outputs → model outputs
 
 # Output folders
 mkdir -p "$BASE_DIR"/outputs/{checkpoints,results}
 # checkpoints → saved model weights and training samples
 # results     → inference outputs
 
-# Ensure venv folder exists
-mkdir -p "$VSC_DATA/venvs"
+# Container folder
+mkdir -p "$VSC_SCRATCH/containers"
+# containers → apptainer .sif files
 
 echo "Done. Next: bash clone_repo.sh"

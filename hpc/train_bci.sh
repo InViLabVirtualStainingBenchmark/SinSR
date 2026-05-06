@@ -66,6 +66,8 @@ fi
 # RUN
 # =========================================================
 
+mkdir -p "$VSC_SCRATCH/datasets/BCI"
+
 srun apptainer exec --nv \
     -B "$VSC_SCRATCH/datasets/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
