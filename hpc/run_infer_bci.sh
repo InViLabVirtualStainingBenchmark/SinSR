@@ -24,8 +24,11 @@ if [ -z "$RUN_DIR" ]; then
     echo "ERROR: No training run found under $CKPT_BASE"
     kill $GPU_LOG_PID 2>/dev/null || true; exit 1
 fi
-CKPT_PATH=$(find "$RUN_DIR/ema_ckpts" -name "ema_model_*.pth" 2>/dev/null | sort -V | tail -1)
-if [ -z "$CKPT_PATH" ]; then
+if [ -f "$RUN_DIR/ema_ckpts/ema_best.pth" ]; then
+    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_best.pth"
+elif [ -f "$RUN_DIR/ema_ckpts/ema_model_last.pth" ]; then
+    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_model_last.pth"
+else
     echo "ERROR: No EMA checkpoint found in $RUN_DIR/ema_ckpts"
     kill $GPU_LOG_PID 2>/dev/null || true; exit 1
 fi

@@ -100,7 +100,7 @@ train:
   iterations: 24400
   milestones: [244, 24400]
   weight_decay: 0
-  save_freq: 24400
+  save_freq: 2440
   val_freq: 244
   log_freq: [12, 244, 1]
   save_images: False

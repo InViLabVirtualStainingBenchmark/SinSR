@@ -120,6 +120,7 @@ class TrainerBase:
             if not ema_ckpt_dir.exists():
                 ema_ckpt_dir.mkdir()
             self.ema_ckpt_dir = ema_ckpt_dir
+            self.best_lpips = float('inf')
 
         # logging the configurations
         if self.rank == 0:
@@ -305,13 +306,13 @@ class TrainerBase:
 
     def save_ckpt(self):
         if self.rank == 0:
-            ckpt_path = self.ckpt_dir / 'model_{:d}.pth'.format(self.current_iters)
+            ckpt_path = self.ckpt_dir / 'model_last.pth'
             torch.save({'iters_start': self.current_iters,
                         'log_step': {phase:self.log_step[phase] for phase in ['train', 'val']},
                         'log_step_img': {phase:self.log_step_img[phase] for phase in ['train', 'val']},
                         'state_dict': self.model.state_dict()}, ckpt_path)
             if hasattr(self, 'ema_rate'):
-                ema_ckpt_path = self.ema_ckpt_dir / 'ema_model_{:d}.pth'.format(self.current_iters)
+                ema_ckpt_path = self.ema_ckpt_dir / 'ema_model_last.pth'
                 torch.save(self.ema_state, ema_ckpt_path)
 
     def reload_ema_model(self):
@@ -1259,6 +1260,10 @@ class TrainerDistillDifIR(TrainerDifIR):
                 # self.writer.add_scalar('Validation PSNR', mean_psnr, self.log_step[phase])
                 # self.writer.add_scalar('Validation LPIPS', mean_lpips, self.log_step[phase])
                 self.log_step[phase] += 1
+                if mean_lpips < self.best_lpips:
+                    self.best_lpips = mean_lpips
+                    torch.save(self.ema_state, self.ema_ckpt_dir / 'ema_best.pth')
+                    self.logger.info(f'New best LPIPS={mean_lpips:.4f} at iter {self.current_iters} — saved ema_best.pth')
 
             self.logger.info("="*100)
 
