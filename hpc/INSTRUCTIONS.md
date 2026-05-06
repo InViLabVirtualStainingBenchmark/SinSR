@@ -6,15 +6,18 @@ Run all commands from the cluster login node unless stated otherwise. You can al
 
 ## Script inventory
 
-All scripts live in `hpc/` inside this repo. `setup_project.sh` and `clone_repo.sh` also have copies in `~/` on the cluster — they must exist before the repo is cloned. The repo is the source of truth; if you update them, copy the new version to `~/`.
+All scripts live in `hpc/` inside this repo. `setup_project.sh` and `clone_repo.sh` also have copies in home directory `~/` on the cluster — they must exist before the repo is cloned. The repo is the source of truth; if you update them, copy the new version to cluster.
 
 | Script | Type | What it does |
 |---|---|---|
 | `setup_project.sh` | bash | Creates folder tree under `$VSC_DATA` |
 | `clone_repo.sh` | bash | Clones the SinSR repo; pulls if it already exists |
-| `install_deps.sh` | sbatch | Creates venv, installs dependencies, runs sanity checks |
-| `train_bci.sh` | sbatch | Trains on BCI dataset |
-| `train_mist.sh` | sbatch | Trains on all four MIST stains sequentially (ER, HER2, Ki67, PR) |
+| `train_bci.sh` | sbatch | Trains on BCI dataset (Apptainer container) |
+| `run_sinsr_bci.sh` | bash | Runs inside the container — called by `train_bci.sh` |
+| `train_mist.sh` | sbatch | Trains on MIST stains (Apptainer container) |
+| `run_sinsr_mist.sh` | bash | Runs inside the container — called by `train_mist.sh` |
+| `infer_bci.sh` | sbatch | Runs inference on BCI test set |
+| `infer_mist.sh` | sbatch | Runs inference on all four MIST stains sequentially |
 
 ---
 
@@ -28,34 +31,47 @@ Add your public key to your VSC account via the VSC account page.
 Connect:
 
 ```bash
-ssh vsc21211@login.hpc.uantwerpen.be
+ssh <username>@login.hpc.uantwerpen.be
 echo $VSC_DATA
 echo $VSC_SCRATCH
 ```
 
 Expected:
-- `$VSC_DATA`    = `/data/antwerpen/212/vsc21211`
-- `$VSC_SCRATCH` = `/scratch/antwerpen/212/vsc21211`
+- `$VSC_DATA`    = `/data/antwerpen/<group>/<username>`
+- `$VSC_SCRATCH` = `/scratch/antwerpen/<group>/<username>`
 
-**Step 1.2. Transfer datasets**
+**Step 1.2. Prepare and upload SquashFS archives**
 
-Use a file transfer tool (Cyberduck, FileZilla, WinSCP, scp, rsync) to upload datasets from your local machine to the cluster.
+The container mounts datasets as read-only SquashFS images for fast I/O. Only the `.sqsh` files are needed on the cluster — do not upload the raw dataset directories.
 
-BCI:
-- Source: local `BCI/` folder containing `HE/` and `IHC/`
-- Destination: `$VSC_SCRATCH/datasets/BCI/`
-- Result: `$VSC_SCRATCH/datasets/BCI/HE/{train,test}` and `IHC/{train,test}`
-
-MIST:
-- Source: local `MIST/` folder containing `ER/`, `HER2/`, `Ki67/`, `PR/`
-- Destination: `$VSC_SCRATCH/datasets/MIST/`
-- Result: `$VSC_SCRATCH/datasets/MIST/{ER,HER2,Ki67,PR}/TrainValAB/{trainA,trainB,valA,valB}`
-
-Verify on the cluster:
+Pack the datasets locally before uploading:
 
 ```bash
-ls $VSC_SCRATCH/datasets/BCI/HE/train | wc -l
-ls $VSC_SCRATCH/datasets/MIST/ER/TrainValAB/trainA | wc -l
+mksquashfs /path/to/BCI  BCI.sqsh  -noappend
+mksquashfs /path/to/MIST MIST.sqsh -noappend
+```
+
+The directory structure inside the archives must be:
+```
+BCI.sqsh root:
+    HE/train/    HE/test/
+    IHC/train/   IHC/test/
+
+MIST.sqsh root:
+    ER/TrainValAB/{trainA,trainB,valA,valB}
+    HER2/TrainValAB/...
+    Ki67/TrainValAB/...
+    PR/TrainValAB/...
+```
+
+Upload the archives to the cluster using a file transfer tool (Cyberduck, FileZilla, WinSCP, scp, rsync):
+- Destination: `$VSC_SCRATCH/datasets/BCI.sqsh` and `$VSC_SCRATCH/datasets/MIST.sqsh`
+
+Verify:
+
+```bash
+unsquashfs -l $VSC_SCRATCH/datasets/BCI.sqsh  | head -10
+unsquashfs -l $VSC_SCRATCH/datasets/MIST.sqsh | head -10
 ```
 
 **Step 1.3. Create the project folder tree (manual one time setup, no sbatch)**
@@ -93,111 +109,130 @@ ls $VSC_DATA/projects/sinsr/code/SinSR/weights/
 
 Expected: `resshift_realsrx4_s15_v1.pth` and `autoencoder_vq_f4.pth`
 
----
+**Step 1.6. Build the Apptainer container**
 
-### 2. Environment install (sbatch)
-
-**Step 2.1. Submit install job**
+The training scripts run inside a container defined by `sinsr_nvidia.def` in the repo root. Build it locally (requires Apptainer installed), then upload the `.sif` to the cluster:
 
 ```bash
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/install_deps.sh
+# On your local machine
+apptainer build sinsr_nvidia.sif sinsr_nvidia.def
 ```
 
-**Step 2.2. Monitor**
+Upload the `.sif` to the cluster using a file transfer tool (Cyberduck, FileZilla, WinSCP, scp, rsync):
+- Destination: `$VSC_SCRATCH/containers/sinsr_nvidia.sif`
+
+Verify on the cluster:
 
 ```bash
-squeue -u $USER
+ls $VSC_SCRATCH/containers/sinsr_nvidia.sif
 ```
-
-**Step 2.3. Verify log after job completes**
-
-```bash
-cat $VSC_DATA/projects/sinsr/logs/install.<jobid>.out
-```
-
-Gate: the log must end with `All checks passed` before submitting training.
-If any import check fails, add the missing package to the pip install block in `install_deps.sh` and resubmit.
 
 ---
 
-### 3. Confirmation run (sbatch)
+### 2. Smoke tests (sbatch)
 
-Run 1 epoch on BCI to confirm everything works before committing to full training.
+Run a 1-epoch job for each dataset before committing to full training. This confirms the container, dataset mount, and code all work together.
 
-**Step 3.1. Submit**
+**Step 2.1. BCI smoke test**
+
+Temporarily set in `configs/virtualstaining_bci.yaml` on the cluster:
+
+```yaml
+iterations: 269   # ~1 epoch (3896 images / batch 16)
+milestones: [269, 269]
+save_freq: 269
+val_freq: 269
+```
+
+Also set `--time=00:30:00` in `train_bci.sh`. Then submit:
 
 ```bash
 sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train_bci.sh
 ```
 
-**Step 3.2. Monitor**
-
-```bash
-squeue -u $USER
-tail -f $VSC_DATA/projects/sinsr/logs/train_bci.<jobid>.out
-```
-
-**Step 3.3. Verify pass criteria**
-
-All four must be true before submitting full runs:
-
+Pass criteria:
 1. Log exits without a Python traceback.
-2. Loss values in the log are not NaN.
-3. Checkpoint exists:
-   ```bash
-   find $VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run -name "*.pth" | sort
-   ```
-4. GPU log has entries with non-zero utilization:
-   ```bash
-   tail -5 $VSC_DATA/projects/sinsr/logs/gpu_bci_<jobid>.csv
-   ```
+2. Loss values are not NaN.
+3. Checkpoint exists under `$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run/`.
+4. GPU log has non-zero utilization entries.
 
-**Step 3.4. Calibrate timing for full runs**
+**Step 2.2. MIST smoke test (ER stain only)**
 
-Check the wall time of the 1-epoch job. Multiply by the number of epochs you plan to run and add a 20% margin. Update `--time` in `train_bci.sh` and `train_mist.sh` accordingly.
+Temporarily set in `configs/virtualstaining_mist_er.yaml` on the cluster:
 
-The partition maximum is 24 hours. If the full run exceeds this, split into multiple jobs resuming from the latest checkpoint.
+```yaml
+iterations: 65   # ~1 epoch (4153 images / batch 16)
+milestones: [65, 65]
+save_freq: 65
+val_freq: 65
+```
 
----
-
-### 4. Full training (sbatch)
-
-Update `iterations`, `milestones`, `save_freq`, `val_freq`, and `log_freq` in the config files before submitting. See `DOCUMENTATION.md` for the parameter reference.
-
-Only one GPU node is available so BCI and MIST jobs will queue sequentially. You can submit both since the scheduler runs them one after the other automatically.
+Also set `--time=00:30:00` in `train_mist.sh`. Then submit:
 
 ```bash
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train_bci.sh
 sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train_mist.sh
 ```
 
-Monitor progress:
+Pass criteria: same as BCI, but check `$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/`.
+
+After both smoke tests pass, restore all config values and `--time` before full training.
+
+---
+
+### 3. Full training (sbatch)
+
+Restore config values on the cluster before submitting:
+
+**BCI** (`configs/virtualstaining_bci.yaml`):
+```yaml
+iterations: 24400
+milestones: [244, 24400]
+save_freq: 24400
+val_freq: 244
+```
+
+**MIST** (all four stain configs):
+```yaml
+iterations: 6500
+milestones: [65, 6500]
+save_freq: 6500
+val_freq: 65
+```
+
+`save_freq` is set to the total iterations so checkpoints are only written once at the end — this avoids NFS write failures during training. `val_freq` is set to one epoch so the full convergence curve is captured in the log.
+
+Restore `--time=20:00:00` in both `train_bci.sh` and `train_mist.sh`.
+
+Submit BCI and all four MIST stains as separate jobs — they can run in parallel if GPUs are available:
 
 ```bash
-squeue -u $USER
+cd $VSC_DATA/projects/sinsr/code/SinSR
 
-tail -f $VSC_DATA/projects/sinsr/logs/train_bci.<jobid>.out
-tail -f $VSC_DATA/projects/sinsr/logs/train_mist.<jobid>.out
+sbatch hpc/train_bci.sh
 
-find $VSC_DATA/projects/sinsr/outputs/checkpoints -name "*.pth" | sort
+sbatch --job-name=sinsr_mist_er   --export=ALL,STAIN=ER   hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_her2 --export=ALL,STAIN=HER2 hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_ki67 --export=ALL,STAIN=Ki67 hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_pr   --export=ALL,STAIN=PR   hpc/train_mist.sh
 ```
 
 ---
 
-## Key paths on the cluster
+### 4. Inference (sbatch)
 
-| Artifact | Path |
-|---|---|
-| Repo | `$VSC_DATA/projects/sinsr/code/SinSR/` |
-| venv | `$VSC_DATA/venvs/venv_sinsr/` |
-| Scripts | `$VSC_DATA/projects/sinsr/code/SinSR/hpc/` |
-| Configs | `$VSC_DATA/projects/sinsr/code/SinSR/configs/` |
-| Weights | `$VSC_DATA/projects/sinsr/code/SinSR/weights/` |
-| SLURM logs | `$VSC_DATA/projects/sinsr/logs/` |
-| Checkpoints | `$VSC_DATA/projects/sinsr/outputs/checkpoints/` |
-| Results | `$VSC_DATA/projects/sinsr/outputs/results/` |
-| BCI dataset | `$VSC_SCRATCH/datasets/BCI/` |
-| MIST dataset | `$VSC_SCRATCH/datasets/MIST/` |
+Run after training completes. Scripts automatically pick the most recent training run and its highest-iteration EMA checkpoint.
+
+```bash
+sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/infer_bci.sh
+sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/infer_mist.sh
+```
+
+Verify output:
+
+```bash
+find $VSC_DATA/projects/sinsr/outputs/results/bci_test -name "*.png" | wc -l
+find $VSC_DATA/projects/sinsr/outputs/results/mist_er_test -name "*.png" | wc -l
+```
 
 ---
 
@@ -227,11 +262,11 @@ find $VSC_DATA/projects/sinsr/outputs/checkpoints -name "*.pth" | sort
 
 ---
 
-## Common issues
+## Issues
 
-| Problem | Cause | Fix                                                                                                 |
-|---|---|-----------------------------------------------------------------------------------------------------|
-| `Disk quota exceeded` when creating symlinks | Scratch inode limit (~48k symlinks exceeded quota) | Do not create symlinks — configs already point directly to source dataset paths                     |
-| `ModuleNotFoundError: No module named 'albumentations'` | Package missing from venv | `pip install albumentations` or add it to the pip install block in `install_deps.sh` and resubmit   |
-| `ERROR: Model weights not found` at job start | Weights not downloaded | Copy the weights as described above to the project root on the cluster                              |
-| `RuntimeError: Input type (Half) and bias type (float)` during validation | fp16 bug in the validation code path | Set all three `use_fp16: False` in the config: `model.params`, `autoencoder`, and `train`           |
+| Problem | Cause | Fix |
+|---|---|---|
+| `Disk quota exceeded` when creating symlinks | Scratch inode limit (~48k symlinks exceeded quota) | Do not create symlinks — configs already point directly to source dataset paths |
+| `RuntimeError: File ... cannot be opened` when saving checkpoint | Transient NFS write error on `$VSC_DATA` | Set `save_freq` to total iterations so checkpoints are only written once at the end |
+| `destination .../datasets/BCI doesn't exist in container` | SquashFS mount point directory missing | The training scripts create it automatically with `mkdir -p` before the apptainer call |
+| `RuntimeError: Input type (Half) and bias type (float)` during validation | fp16 bug in the validation code path | Set all three `use_fp16: False` in the config: `model.params`, `autoencoder`, and `train` |

@@ -84,13 +84,13 @@ traindata/
         val/he/      val/ihc/
 ```
 
-**Cluster** — configs point directly to the source dataset paths, no preparation step needed:
+**Cluster** — datasets are mounted as read-only SquashFS archives. The training scripts mount them automatically; configs point directly to the source paths inside the archive:
 ```
 $VSC_SCRATCH/datasets/
-    BCI/
+    BCI.sqsh   → mounted at $VSC_SCRATCH/datasets/BCI/
         HE/train/    HE/test/
         IHC/train/   IHC/test/
-    MIST/
+    MIST.sqsh  → mounted at $VSC_SCRATCH/datasets/MIST/
         ER/TrainValAB/trainA   trainB   valA   valB
         HER2/TrainValAB/...
         Ki67/TrainValAB/...
@@ -124,29 +124,42 @@ python inference.py --task realsrx4 -i testdata/RealSet65/00003.png -o ./results
 
 ## 7. HPC Scripts
 
-Scripts in `hpc/` for running on the VSC cluster.
+Scripts in `hpc/` for running on the VSC cluster. Training uses an Apptainer container (`sinsr_nvidia.def` in the repo root). See `hpc/INSTRUCTIONS.md` for the full setup sequence including building the container and packing datasets into SquashFS archives.
 
 | Script | How to run | Purpose |
 |---|---|---|
 | `setup_project.sh` | `bash setup_project.sh` | Create project folder structure |
 | `clone_repo.sh` | `bash clone_repo.sh` | Clone the repository |
-| `install_deps.sh` | `sbatch install_deps.sh` | Create venv and install dependencies |
-| `train_bci.sh` | `sbatch train_bci.sh` | Train on BCI dataset |
-| `train_mist.sh` | `sbatch train_mist.sh` | Train on all four MIST stains sequentially |
+| `train_bci.sh` | `sbatch train_bci.sh` | Train on BCI dataset (Apptainer container) |
+| `run_sinsr_bci.sh` | called by `train_bci.sh` | Runs training inside the container |
+| `train_mist.sh` | `sbatch --job-name=sinsr_mist_er --export=ALL,STAIN=ER train_mist.sh` | Train one MIST stain per job; STAIN = ER \| HER2 \| Ki67 \| PR |
+| `run_sinsr_mist.sh` | called by `train_mist.sh` | Runs training inside the container |
+| `infer_bci.sh` | `sbatch infer_bci.sh` | Run inference on BCI test set |
+| `infer_mist.sh` | `sbatch infer_mist.sh` | Run inference on all four MIST stains |
+| `eval_bci.sh` | `sbatch eval_bci.sh` | Evaluate BCI predictions |
+| `eval_mist.sh` | `sbatch eval_mist.sh` | Evaluate all four MIST stain predictions |
 
-`setup_project.sh` and `clone_repo.sh` must be run manually on the login node. They also have copies in `~/` on the cluster since they are needed before the repo is cloned. The remaining three are submitted as SLURM jobs.
+`setup_project.sh` and `clone_repo.sh` must be run manually on the login node. They also have copies in `~/` on the cluster since they are needed before the repo is cloned. The remaining scripts are submitted as SLURM jobs.
 
-Checkpoints and sample images are saved under `$VSC_DATA/projects/sinsr/outputs/`. SLURM and GPU logs are saved under `$VSC_DATA/projects/sinsr/logs/`.
+Checkpoints are saved under `$VSC_DATA/projects/sinsr/outputs/checkpoints/`. SLURM and GPU logs are saved under `$VSC_DATA/projects/sinsr/logs/`. Log filenames include the job name: `sinsr_bci.<jobid>.out`, `sinsr_mist_er.<jobid>.out`, etc.
 
 ---
 
 ## 8. Running
 
-**On cluster:**
+**On cluster** (requires container and SquashFS archives. See `hpc/INSTRUCTIONS.md`):
+
+From the project root:
 ```bash
 sbatch hpc/train_bci.sh
-sbatch hpc/train_mist.sh
+
+sbatch --job-name=sinsr_mist_er   --export=ALL,STAIN=ER   hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_her2 --export=ALL,STAIN=HER2 hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_ki67 --export=ALL,STAIN=Ki67 hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_pr   --export=ALL,STAIN=PR   hpc/train_mist.sh
 ```
+
+Each MIST stain runs as a separate job (~6h each). All four can run simultaneously if GPUs are available.
 
 **Local single GPU:**
 ```bash
