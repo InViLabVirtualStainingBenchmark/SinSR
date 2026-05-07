@@ -93,14 +93,14 @@ train:
   lr: 5e-5
   batch: [64, 8]
   use_fp16: False
-  microbatch: 64
+  microbatch: 16
   seed: 123456
   global_seeding: False
   prefetch_factor: 4
   num_workers: 16
   ema_rate: 0.999
   iterations: 500000
-  milestones: [5000, 50000]
+  milestones: [5000, 500000]
   weight_decay: 0
   save_freq: 2440
   val_freq: 244
