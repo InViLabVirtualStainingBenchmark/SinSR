@@ -19,7 +19,9 @@ set -euo pipefail
 export REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
 export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 export CKPT_BASE="$VSC_DATA/projects/sinsr/outputs/checkpoints"
-export OUT_BASE="$VSC_DATA/projects/sinsr/outputs/results"
+
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
+export OUT_BASE="$GRP_SCRATCH/predictions/sinsr"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_infer_mist.sh"
@@ -64,6 +66,7 @@ mkdir -p "$VSC_SCRATCH/datasets/MIST"
 srun apptainer exec --nv \
     -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
+    -B "$GRP_SCRATCH:$GRP_SCRATCH" \
     "$CONTAINER" \
     bash "$RUN_SCRIPT"
 
