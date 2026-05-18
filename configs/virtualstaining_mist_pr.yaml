@@ -68,8 +68,8 @@ data:
   train:
     type: paired
     params:
-      he_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/ER/TrainValAB/trainA
-      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/ER/TrainValAB/trainB
+      he_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/PR/TrainValAB/trainA
+      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/PR/TrainValAB/trainB
       gt_size: 256
       split: train
       val_ratio: 0.1
@@ -78,8 +78,8 @@ data:
   val:
     type: paired
     params:
-      he_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/ER/TrainValAB/trainA
-      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/ER/TrainValAB/trainB
+      he_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/PR/TrainValAB/trainA
+      ihc_path: /scratch/antwerpen/212/vsc21211/datasets/MIST/PR/TrainValAB/trainB
       gt_size: 256
       split: val
       val_ratio: 0.1
