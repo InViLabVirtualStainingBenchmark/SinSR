@@ -103,7 +103,7 @@ train:
   milestones: [5000, 500000]
   weight_decay: 0
   save_freq: 2440
-  val_freq: 590
+  val_freq: 3000
   log_freq: [200, 5000, 1]
   save_images: False
   use_ema_val: True
