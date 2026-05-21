@@ -159,6 +159,8 @@ class TrainerBase:
             if self.rank == 0:
                 self.log_step = ckpt['log_step']
                 self.log_step_img = ckpt['log_step_img']
+                if hasattr(self, 'best_lpips') and 'best_lpips' in ckpt:
+                    self.best_lpips = ckpt['best_lpips']
 
             # EMA model
             if self.rank == 0 and hasattr(self, 'ema_rate'):
@@ -310,7 +312,8 @@ class TrainerBase:
             torch.save({'iters_start': self.current_iters,
                         'log_step': {phase:self.log_step[phase] for phase in ['train', 'val']},
                         'log_step_img': {phase:self.log_step_img[phase] for phase in ['train', 'val']},
-                        'state_dict': self.model.state_dict()}, ckpt_path)
+                        'state_dict': self.model.state_dict(),
+                        'best_lpips': self.best_lpips if hasattr(self, 'best_lpips') else float('inf')}, ckpt_path)
             if hasattr(self, 'ema_rate'):
                 ema_ckpt_path = self.ema_ckpt_dir / 'ema_model_last.pth'
                 torch.save(self.ema_state, ema_ckpt_path)
