@@ -36,7 +36,7 @@ export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower
 # Set to a checkpoint .pth path to resume, e.g.:
 #   export RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/2026-05-04-14-19/ckpts/model_65.pth"
 # Leave empty for a fresh run.
-export RESUME=""
+export RESUME="${RESUME:-}"
 
 # =========================================================
 # ENVIRONMENT
