@@ -344,11 +344,11 @@ class TrainerBase:
             chn = batch['gt'].shape[1]
             num_timesteps = self.base_diffusion.num_timesteps
             record_steps = [1, num_timesteps //2, num_timesteps]
-            if self.current_iters % self.configs.train.log_freq[0] == 1:
+            if self.current_iters % self.configs.train.log_freq[0] == 1 or not hasattr(self, 'loss_mean'):
                 self.loss_mean = {key:torch.zeros(size=(len(record_steps),), dtype=torch.float64)
                                   for key in loss.keys()}
                 self.loss_count = torch.zeros(size=(len(record_steps),), dtype=torch.float64)
-            
+
             for jj in range(len(record_steps)):
                 for key, value in loss.items():
                     index = record_steps[jj] - 1
@@ -1104,7 +1104,7 @@ class TrainerDistillDifIR(TrainerDifIR):
             chn = batch['gt'].shape[1]
             num_timesteps = self.base_diffusion.num_timesteps
             record_steps = [1, num_timesteps //2, num_timesteps]
-            if self.current_iters % self.configs.train.log_freq[0] == 1:
+            if self.current_iters % self.configs.train.log_freq[0] == 1 or not hasattr(self, 'loss_mean'):
                 self.loss_mean = {key:torch.zeros(size=(len(record_steps),), dtype=torch.float64)
                                   for key in loss.keys()}
                 self.loss_count = torch.zeros(size=(len(record_steps),), dtype=torch.float64)
