@@ -27,7 +27,7 @@ export STAIN
 
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
-export OUT_DIR="$GRP_SCRATCH/predictions/sinsr/mist_${stain_lower}_test"
+export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/mist_${stain_lower}_test"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_infer_mist.sh"
