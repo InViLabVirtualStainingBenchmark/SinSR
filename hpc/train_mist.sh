@@ -22,6 +22,7 @@ export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_sinsr_mist.sh"
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 
 # Stain to train: ER | HER2 | Ki67 | PR
 # Override at submission with: sbatch --export=ALL,STAIN=HER2 train_mist.sh
@@ -57,11 +58,11 @@ fi
 echo "  $CONTAINER"
 
 echo "=== Checking dataset ==="
-if [ ! -f "$VSC_SCRATCH/datasets/MIST.sqsh" ]; then
-    echo "ERROR: MIST SquashFS archive not found: $VSC_SCRATCH/datasets/MIST.sqsh"
+if [ ! -f "$GRP_SCRATCH/datasets/MIST/MIST.sqsh" ]; then
+    echo "ERROR: MIST SquashFS archive not found: $GRP_SCRATCH/datasets/MIST/MIST.sqsh"
     exit 1
 fi
-echo "  MIST.sqsh : $(du -h "$VSC_SCRATCH/datasets/MIST.sqsh" | cut -f1)"
+echo "  MIST.sqsh : $(du -h "$GRP_SCRATCH/datasets/MIST/MIST.sqsh" | cut -f1)"
 
 echo "=== Checking weights ==="
 if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || \
@@ -80,10 +81,10 @@ fi
 # RUN
 # =========================================================
 
-mkdir -p "$VSC_SCRATCH/datasets/MIST"
+mkdir -p "$GRP_SCRATCH/datasets/MIST"
 
 srun apptainer exec --nv \
-    -B "$VSC_SCRATCH/datasets/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
+    -B "$GRP_SCRATCH/datasets/MIST/MIST.sqsh:$GRP_SCRATCH/datasets/MIST:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     "$CONTAINER" \
     bash "$RUN_SCRIPT"

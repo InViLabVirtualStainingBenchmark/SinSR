@@ -13,9 +13,10 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
            --format=csv -l 5 \
     > "$LOG_DIR/gpu_infer_mist_${STAIN}_${SLURM_JOB_ID}.csv" & GPU_LOG_PID=$!
 
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
 CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
-HE_TEST="$VSC_SCRATCH/datasets/MIST/$STAIN/TrainValAB/valA"
+HE_TEST="$GRP_SCRATCH/datasets/MIST/$STAIN/TrainValAB/valA"
 CKPT_DIR_BASE="$CKPT_BASE/mist_${stain_lower}_run"
 
 cd "$REPO_DIR"
@@ -26,20 +27,14 @@ cd "$REPO_DIR"
 
 echo ""
 echo "=== Checkpoint check ==="
-RUN_DIR=$(find "$CKPT_DIR_BASE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -1)
-if [ -z "$RUN_DIR" ]; then
-    echo "ERROR: No training run found under $CKPT_DIR_BASE"
+CKPT_PATH=$(find "$CKPT_DIR_BASE" -name "ema_best.pth" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+if [ -z "$CKPT_PATH" ]; then
+    CKPT_PATH=$(find "$CKPT_DIR_BASE" -name "ema_model_last.pth" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+fi
+if [ -z "$CKPT_PATH" ]; then
+    echo "ERROR: No EMA checkpoint found under $CKPT_DIR_BASE"
     kill $GPU_LOG_PID 2>/dev/null || true; exit 1
 fi
-if [ -f "$RUN_DIR/ema_ckpts/ema_best.pth" ]; then
-    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_best.pth"
-elif [ -f "$RUN_DIR/ema_ckpts/ema_model_last.pth" ]; then
-    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_model_last.pth"
-else
-    echo "ERROR: No EMA checkpoint found in $RUN_DIR/ema_ckpts"
-    kill $GPU_LOG_PID 2>/dev/null || true; exit 1
-fi
-echo "  Run dir    : $RUN_DIR"
 echo "  Checkpoint : $CKPT_PATH"
 
 # =========================================================

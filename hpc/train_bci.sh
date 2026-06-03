@@ -29,6 +29,7 @@ export RESUME="${RESUME:-}"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_sinsr_bci.sh"
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 
 # =========================================================
 # ENVIRONMENT
@@ -49,11 +50,11 @@ fi
 echo "  $CONTAINER"
 
 echo "=== Checking dataset ==="
-if [ ! -f "$VSC_SCRATCH/datasets/BCI.sqsh" ]; then
-    echo "ERROR: BCI SquashFS archive not found: $VSC_SCRATCH/datasets/BCI.sqsh"
+if [ ! -f "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" ]; then
+    echo "ERROR: BCI SquashFS archive not found: $GRP_SCRATCH/datasets/BCI/BCI.sqsh"
     exit 1
 fi
-echo "  BCI.sqsh : $(du -h "$VSC_SCRATCH/datasets/BCI.sqsh" | cut -f1)"
+echo "  BCI.sqsh : $(du -h "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" | cut -f1)"
 
 echo "=== Checking weights ==="
 if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || \
@@ -66,10 +67,10 @@ fi
 # RUN
 # =========================================================
 
-mkdir -p "$VSC_SCRATCH/datasets/BCI"
+mkdir -p "$GRP_SCRATCH/datasets/BCI"
 
 srun apptainer exec --nv \
-    -B "$VSC_SCRATCH/datasets/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
+    -B "$GRP_SCRATCH/datasets/BCI/BCI.sqsh:$GRP_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     "$CONTAINER" \
     bash "$RUN_SCRIPT"

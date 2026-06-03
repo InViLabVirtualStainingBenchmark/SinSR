@@ -45,11 +45,11 @@ fi
 echo "  $CONTAINER"
 
 echo "=== Checking dataset ==="
-if [ ! -f "$VSC_SCRATCH/datasets/BCI.sqsh" ]; then
-    echo "ERROR: BCI SquashFS archive not found: $VSC_SCRATCH/datasets/BCI.sqsh"
+if [ ! -f "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" ]; then
+    echo "ERROR: BCI SquashFS archive not found: $GRP_SCRATCH/datasets/BCI/BCI.sqsh"
     exit 1
 fi
-echo "  BCI.sqsh : $(du -h "$VSC_SCRATCH/datasets/BCI.sqsh" | cut -f1)"
+echo "  BCI.sqsh : $(du -h "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" | cut -f1)"
 
 echo "=== Checking weights ==="
   if [ ! -f "$REPO_DIR/weights/autoencoder_vq_f4.pth" ]; then
@@ -61,11 +61,11 @@ echo "=== Checking weights ==="
 # RUN
 # =========================================================
 
-mkdir -p "$VSC_SCRATCH/datasets/BCI"
+mkdir -p "$GRP_SCRATCH/datasets/BCI"
 mkdir -p "$OUT_DIR"
 
 srun apptainer exec --nv \
-    -B "$VSC_SCRATCH/datasets/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
+    -B "$GRP_SCRATCH/datasets/BCI/BCI.sqsh:$GRP_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     -B "$GRP_SCRATCH:$GRP_SCRATCH" \
     "$CONTAINER" \

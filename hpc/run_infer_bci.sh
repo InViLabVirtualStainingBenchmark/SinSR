@@ -19,27 +19,22 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 
 echo ""
 echo "=== Checkpoint check ==="
-RUN_DIR=$(find "$CKPT_BASE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -1)
-if [ -z "$RUN_DIR" ]; then
-    echo "ERROR: No training run found under $CKPT_BASE"
+CKPT_PATH=$(find "$CKPT_BASE" -name "ema_best.pth" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+if [ -z "$CKPT_PATH" ]; then
+    CKPT_PATH=$(find "$CKPT_BASE" -name "ema_model_last.pth" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+fi
+if [ -z "$CKPT_PATH" ]; then
+    echo "ERROR: No EMA checkpoint found under $CKPT_BASE"
     kill $GPU_LOG_PID 2>/dev/null || true; exit 1
 fi
-if [ -f "$RUN_DIR/ema_ckpts/ema_best.pth" ]; then
-    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_best.pth"
-elif [ -f "$RUN_DIR/ema_ckpts/ema_model_last.pth" ]; then
-    CKPT_PATH="$RUN_DIR/ema_ckpts/ema_model_last.pth"
-else
-    echo "ERROR: No EMA checkpoint found in $RUN_DIR/ema_ckpts"
-    kill $GPU_LOG_PID 2>/dev/null || true; exit 1
-fi
-echo "  Run dir    : $RUN_DIR"
 echo "  Checkpoint : $CKPT_PATH"
 
 # =========================================================
 # DATASET CHECK
 # =========================================================
 
-HE_TEST="$VSC_SCRATCH/datasets/BCI/HE/test"
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
+HE_TEST="$GRP_SCRATCH/datasets/BCI/HE/test"
 CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
 
 echo ""
