@@ -64,7 +64,8 @@ python3 inference.py \
     -i "$HE_TEST" \
     -o "$OUT_DIR" \
     --scale 1 \
-    --one_step
+    --one_step \
+    --chop_size 256
 
 kill $GPU_LOG_PID 2>/dev/null || true
 
