@@ -1,30 +1,27 @@
 #!/bin/bash
-#SBATCH --job-name=sinsr_infer_bci
+#SBATCH --job-name=sinsr_eval_bci
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=60G
-#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
 #SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.out
 #SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.err
 
-# infer_bci.sh — BCI test inference. Submit after train_bci.sh completes.
-# Automatically finds ema_best.pth (best validation LPIPS) by modification time; falls back to ema_model_last.pth.
+# eval_bci.sh — Evaluate SinSR predictions on BCI test set.
+# Submit after infer_bci.sh completes.
 
 set -euo pipefail
 
-export REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
-export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
-export CKPT_BASE="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
-
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
-export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_test"
-
-CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
-RUN_SCRIPT="$REPO_DIR/hpc/run_infer_bci.sh"
+PRED_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_test"
+GT_DIR="$GRP_SCRATCH/datasets/BCI/IHC/test"
+OUTPUT_CSV="$VSC_DATA/benchmark_results.csv"
+EVAL_SCRIPT="$VSC_DATA/evaluate/evaluate.py"
+CONTAINER="$VSC_SCRATCH/containers/evaluate_nvidia.sif"
 
 # =========================================================
 # ENVIRONMENT
@@ -44,32 +41,49 @@ if [ ! -f "$CONTAINER" ]; then
 fi
 echo "  $CONTAINER"
 
-echo "=== Checking dataset ==="
+echo "=== Eval script ==="
+if [ ! -f "$EVAL_SCRIPT" ]; then
+    echo "ERROR: evaluate.py not found at $EVAL_SCRIPT"
+    exit 1
+fi
+
+echo "=== Predictions ==="
+if [ ! -d "$PRED_DIR" ]; then
+    echo "ERROR: Predictions folder not found: $PRED_DIR"
+    echo "  Run infer_bci.sh first."
+    exit 1
+fi
+echo "  $(find "$PRED_DIR" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" \) | wc -l) predicted images"
+
+echo "=== Dataset archive ==="
 if [ ! -f "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" ]; then
     echo "ERROR: BCI SquashFS archive not found: $GRP_SCRATCH/datasets/BCI/BCI.sqsh"
     exit 1
 fi
-echo "  BCI.sqsh : $(du -h "$GRP_SCRATCH/datasets/BCI/BCI.sqsh" | cut -f1)"
-
-echo "=== Checking weights ==="
-  if [ ! -f "$REPO_DIR/weights/autoencoder_vq_f4.pth" ]; then
-      echo "ERROR: autoencoder_vq_f4.pth not found in $REPO_DIR/weights/"
-      exit 1
-  fi
 
 # =========================================================
-# RUN
+# EVALUATION
 # =========================================================
+
+echo ""
+echo "=== Starting BCI evaluation ==="
 
 mkdir -p "$GRP_SCRATCH/datasets/BCI"
-mkdir -p "$OUT_DIR"
 
 srun apptainer exec --nv \
     -B "$GRP_SCRATCH/datasets/BCI/BCI.sqsh:$GRP_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     -B "$GRP_SCRATCH:$GRP_SCRATCH" \
     "$CONTAINER" \
-    bash "$RUN_SCRIPT"
+    python "$EVAL_SCRIPT" \
+        --pred         "$PRED_DIR" \
+        --gt           "$GT_DIR" \
+        --model_name   SinSR \
+        --dataset_name BCI \
+        --split_name   test \
+        --match_by     sort \
+        --output       "$OUTPUT_CSV" \
+        --device       cuda
 
 echo ""
-echo "BCI inference complete."
+echo "BCI evaluation complete. Results appended to: $OUTPUT_CSV"
