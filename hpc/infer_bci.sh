@@ -61,11 +61,11 @@ echo "=== Checking weights ==="
 # RUN
 # =========================================================
 
-mkdir -p "$GRP_SCRATCH/datasets/BCI"
+mkdir -p "$VSC_SCRATCH/datasets/BCI"
 mkdir -p "$OUT_DIR"
 
 srun apptainer exec --nv \
-    -B "$GRP_SCRATCH/datasets/BCI/BCI.sqsh:$GRP_SCRATCH/datasets/BCI:image-src=/" \
+    -B "$GRP_SCRATCH/datasets/BCI/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     -B "$GRP_SCRATCH:$GRP_SCRATCH" \
     "$CONTAINER" \

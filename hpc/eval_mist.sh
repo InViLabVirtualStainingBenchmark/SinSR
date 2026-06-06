@@ -56,13 +56,13 @@ fi
 # EVALUATION — ALL MIST STAINS
 # =========================================================
 
-mkdir -p "$GRP_SCRATCH/datasets/MIST"
+mkdir -p "$VSC_SCRATCH/datasets/MIST"
 
 for stain in ER HER2 Ki67 PR; do
 
     stain_lower=$(echo "$stain" | tr '[:upper:]' '[:lower:]')
     PRED_DIR="$OUT_BASE/mist_${stain_lower}_test"
-    GT_DIR="$GRP_SCRATCH/datasets/MIST/$stain/TrainValAB/valB"
+    GT_DIR="$VSC_SCRATCH/datasets/MIST/$stain/TrainValAB/valB"
 
     echo ""
     echo "========================================="
@@ -76,7 +76,7 @@ for stain in ER HER2 Ki67 PR; do
     echo "  Predictions : $(find "$PRED_DIR" -maxdepth 1 -type f \( -name "*.png" -o -name "*.jpg" \) | wc -l) images"
 
     srun apptainer exec --nv \
-        -B "$GRP_SCRATCH/datasets/MIST/MIST.sqsh:$GRP_SCRATCH/datasets/MIST:image-src=/" \
+        -B "$GRP_SCRATCH/datasets/MIST/MIST.sqsh:$VSC_SCRATCH/datasets/MIST:image-src=/" \
         -B "$VSC_DATA:$VSC_DATA" \
         -B "$GRP_SCRATCH:$GRP_SCRATCH" \
         "$CONTAINER" \

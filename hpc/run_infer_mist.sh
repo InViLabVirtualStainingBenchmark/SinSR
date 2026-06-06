@@ -16,7 +16,7 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
 CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
-HE_TEST="$GRP_SCRATCH/datasets/MIST/$STAIN/TrainValAB/valA"
+HE_TEST="$VSC_SCRATCH/datasets/MIST/$STAIN/TrainValAB/valA"
 CKPT_DIR_BASE="$CKPT_BASE/mist_${stain_lower}_run"
 
 cd "$REPO_DIR"

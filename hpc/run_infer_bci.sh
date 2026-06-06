@@ -34,7 +34,7 @@ echo "  Checkpoint : $CKPT_PATH"
 # =========================================================
 
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
-HE_TEST="$GRP_SCRATCH/datasets/BCI/HE/test"
+HE_TEST="$VSC_SCRATCH/datasets/BCI/HE/test"
 CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
 
 echo ""
