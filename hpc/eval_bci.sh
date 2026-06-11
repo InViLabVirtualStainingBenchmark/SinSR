@@ -17,7 +17,8 @@
 set -euo pipefail
 
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
-PRED_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_test"
+: "${RUN_SUFFIX:=chop256}"
+PRED_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_${RUN_SUFFIX}"
 GT_DIR="$VSC_SCRATCH/datasets/BCI/IHC/test"
 OUTPUT_CSV="$VSC_DATA/benchmark_results.csv"
 EVAL_SCRIPT="$VSC_DATA/evaluate/evaluate.py"

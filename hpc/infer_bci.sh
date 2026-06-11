@@ -21,7 +21,8 @@ export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 export CKPT_BASE="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
 
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
-export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_test"
+: "${RUN_SUFFIX:=chop256}"
+export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_${RUN_SUFFIX}"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
 RUN_SCRIPT="$REPO_DIR/hpc/run_infer_bci.sh"

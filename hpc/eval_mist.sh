@@ -17,6 +17,7 @@
 set -euo pipefail
 
 GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
+: "${RUN_SUFFIX:=chop256}"
 OUT_BASE="$GRP_SCRATCH/diffusion-predictions/sinsr"
 OUTPUT_CSV="$VSC_DATA/benchmark_results.csv"
 EVAL_SCRIPT="$VSC_DATA/evaluate/evaluate.py"
@@ -61,7 +62,7 @@ mkdir -p "$VSC_SCRATCH/datasets/MIST"
 for stain in ER HER2 Ki67 PR; do
 
     stain_lower=$(echo "$stain" | tr '[:upper:]' '[:lower:]')
-    PRED_DIR="$OUT_BASE/mist_${stain_lower}_test"
+    PRED_DIR="$OUT_BASE/mist_${stain_lower}_${RUN_SUFFIX}"
     GT_DIR="$VSC_SCRATCH/datasets/MIST/$stain/TrainValAB/valB"
 
     echo ""
