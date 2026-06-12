@@ -1,4 +1,4 @@
-# SinSR — Virtual Staining Adaptation
+# SinSR - Virtual Staining Adaptation
 
 Changes made to the original SinSR repository to support paired HE→IHC virtual staining on BCI and MIST datasets.
 
@@ -26,11 +26,12 @@ Key changes from the original `configs/SinSR.yaml`:
 | `data.*.params.split` | — | `train` / `val` | Deterministic split by sorted filename |
 | `train.learn_xT` | `True` | `False` | Teacher trained on SR degradations, incompatible with HE→IHC |
 | `train.microbatch` | `64` | `16` | OOM fix — see note below |
-| `train.save_freq` | `2000` | `2440` | Save every ~10% of iterations for resume safety |
-| `train.val_freq` | `2000` | `244` | Validate every ~1% for best checkpoint tracking |
+| `train.iterations` | `500000` | `45000` | Capped by compute time budget on HPC |
+| `train.save_freq` | `2000` | `2440` | ~18 saves over full training for resume safety |
+| `train.val_freq` | `2000` | `3000` | 15 validation passes over full training for best checkpoint tracking |
 | `train.save_images` | `True` | `False` | Saves cluster storage |
 
-All other training parameters (`lr`, `batch`, `num_workers`, `prefetch_factor`, `ema_rate`, `iterations`, `weight_decay`) are kept at the original SinSR values.
+All other training parameters (`lr`, `batch`, `num_workers`, `prefetch_factor`, `ema_rate`, `weight_decay`) are kept at the original SinSR values.
 
 `learn_xT: False` — the teacher was trained on super-resolution degradations, so its noise predictions are incompatible with the HE→IHC domain.
 
@@ -88,12 +89,13 @@ Applied in: `training_losses_distill`, `p_sample_loop_progressive`, `ddim_sample
 
 ### Checkpoint saving
 
-Only two checkpoint files are kept, both overwritten on each update:
+Three checkpoint files are kept, all overwritten on each update:
 
 | File | When saved | Purpose |
 |---|---|---|
-| `ema_ckpts/ema_model_last.pth` | Every `save_freq` iterations | Resume if job is killed |
-| `ema_ckpts/ema_best.pth` | When val LPIPS improves | Best model for inference |
+| `ckpts/model_last.pth` | Every `save_freq` iterations | Resume anchor — passed to `--resume` |
+| `ema_ckpts/ema_model_last.pth` | Every `save_freq` iterations | EMA weights for inference fallback |
+| `ema_ckpts/ema_best.pth` | When val LPIPS improves | Best EMA weights for inference |
 
 No numbered checkpoints accumulate. `ema_best.pth` is selected by val LPIPS (lower = better).
 
@@ -105,32 +107,23 @@ Diffusion outputs can slightly exceed `[0, 1]` after denormalization, causing CL
 iqa_input = (results.detach() * 0.5 + 0.5).clamp(0, 1)
 ```
 
+### Resume crash fix (`loss_mean`)
+
+`loss_mean` was only initialized inside `log_step_train` when `current_iters % log_freq[0] == 1`. On a resumed run `current_iters` picks up mid-cycle, so that condition is never true before the first access, crashing with `AttributeError: 'TrainerDistillDifIR' object has no attribute 'loss_mean'`.
+
+Fix: added `or not hasattr(self, 'loss_mean')` to the initialization guard in both `log_step_train` implementations (`TrainerBase` and `TrainerDistillDifIR`):
+
+```python
+if self.current_iters % self.configs.train.log_freq[0] == 1 or not hasattr(self, 'loss_mean'):
+```
+
 ---
 
 ## 6. Training Data Structure
 
 Images must be at least 256×256. Filenames must match between HE and IHC folders.
 
-**Local:**
-```
-traindata/
-    BCI/
-        train/he/    train/ihc/
-        val/he/      val/ihc/
-```
-
-**Cluster** — datasets are mounted as read-only SquashFS archives. The training scripts mount them automatically; configs point directly to the source paths inside the archive:
-```
-$VSC_SCRATCH/datasets/
-    BCI.sqsh   → mounted at $VSC_SCRATCH/datasets/BCI/
-        HE/train/    HE/test/
-        IHC/train/   IHC/test/
-    MIST.sqsh  → mounted at $VSC_SCRATCH/datasets/MIST/
-        ER/TrainValAB/trainA   trainB   valA   valB
-        HER2/TrainValAB/...
-        Ki67/TrainValAB/...
-        PR/TrainValAB/...
-```
+**Cluster** — datasets are mounted as read-only SquashFS archives. For archive structure, upload paths, and mount verification, see `hpc/INSTRUCTIONS.md` step 1.2.
 
 ---
 
@@ -138,86 +131,127 @@ $VSC_SCRATCH/datasets/
 
 Required weights (not included in the repo). Download and place them in the `weights/` folder under the project root.
 
-| File | Purpose |
-|---|---|
-| `weights/resshift_realsrx4_s15_v1.pth` | Teacher model for distillation |
-| `weights/autoencoder_vq_f4.pth` | VQ-VAE encoder/decoder |
-
-| File | Download |
-|---|---|
-| `weights/resshift_realsrx4_s15_v1.pth` | https://github.com/wyf0912/SinSR/releases/download/v1.0/resshift_realsrx4_s15_v1.pth |
-| `weights/autoencoder_vq_f4.pth` | https://github.com/zsyOAOA/ResShift/releases/download/v2.0/autoencoder_vq_f4.pth |
-
-You can also download by running inference once — weights are fetched automatically from GitHub releases:
-
-```bash
-python inference.py --task realsrx4 -i testdata/RealSet65/00003.png -o ./results --scale 4
-```
+| File | Purpose | Download |
+|---|---|---|
+| `weights/resshift_realsrx4_s15_v1.pth` | Teacher model for distillation | https://github.com/wyf0912/SinSR/releases/download/v1.0/resshift_realsrx4_s15_v1.pth |
+| `weights/autoencoder_vq_f4.pth` | VQ-VAE encoder/decoder | https://github.com/zsyOAOA/ResShift/releases/download/v2.0/autoencoder_vq_f4.pth |
 
 ---
 
 ## 8. HPC Scripts
 
-Scripts in `hpc/` for running on the VSC cluster. Training uses an Apptainer container (`sinsr_nvidia.def` in the repo root). Evaluation uses a shared container from the evaluate repo (`evaluate_nvidia.sif`). See `hpc/INSTRUCTIONS.md` for the full setup sequence.
-
-| Script | How to run | Purpose |
-|---|---|---|
-| `setup_project.sh` | `bash setup_project.sh` | Create project folder structure |
-| `clone_repo.sh` | `bash clone_repo.sh` | Clone the repository |
-| `train_bci.sh` | `sbatch train_bci.sh` | Train on BCI dataset (Apptainer container) |
-| `run_sinsr_bci.sh` | called by `train_bci.sh` | Runs training inside the container |
-| `train_mist.sh` | `sbatch --job-name=sinsr_mist_er --export=ALL,STAIN=ER train_mist.sh` | Train one MIST stain per job; STAIN = ER \| HER2 \| Ki67 \| PR |
-| `run_sinsr_mist.sh` | called by `train_mist.sh` | Runs training inside the container |
-| `infer_bci.sh` | `sbatch infer_bci.sh` | Run inference on BCI test set |
-| `run_infer_bci.sh` | called by `infer_bci.sh` | Runs inference inside the container; auto-discovers `ema_best.pth` |
-| `infer_mist.sh` | `sbatch infer_mist.sh` | Run inference on all four MIST stains |
-| `run_infer_mist.sh` | called by `infer_mist.sh` | Runs inference inside the container per stain |
-| `eval_bci.sh` | `sbatch eval_bci.sh` | Evaluate BCI predictions using evaluate container |
-| `eval_mist.sh` | `sbatch eval_mist.sh` | Evaluate all four MIST stain predictions using evaluate container |
-
-`setup_project.sh` and `clone_repo.sh` must be run manually on the login node. All remaining scripts are submitted as SLURM jobs.
-
-Checkpoints are saved under `$VSC_DATA/projects/sinsr/outputs/checkpoints/`. SLURM and GPU logs are saved under `$VSC_DATA/projects/sinsr/logs/`.
-
-### Evaluation pipeline
-
-Evaluation uses the shared `evaluate_nvidia.sif` container from the evaluate repo. The eval scripts mount the dataset SquashFS directly for GT access — no unsquashing needed. Results are appended to `$VSC_DATA/benchmark_results.csv`.
-
-Submit in order:
-```bash
-sbatch hpc/infer_bci.sh    # after training completes
-sbatch hpc/eval_bci.sh     # after inference completes
-```
-
-The eval container must be built once locally from `evaluate/hpc_jobs/evaluate_nvidia.def` and uploaded to `$VSC_SCRATCH/containers/evaluate_nvidia.sif`. LPIPS weights must be pre-downloaded on the login node before the first eval job — see the evaluate repo's `hpc_jobs/cluster_plan_container.md`.
+Scripts in `hpc/` for running on the VSC cluster. See `hpc/INSTRUCTIONS.md` for the full script inventory, setup sequence, and all submission commands.
 
 ---
 
-## 9. Running
+## 9. Resuming Training
 
-**On cluster** (requires container and SquashFS archives — see `hpc/INSTRUCTIONS.md`):
+See `hpc/INSTRUCTIONS.md` section 6.
 
-```bash
-# Training
-sbatch hpc/train_bci.sh
+---
 
-sbatch --job-name=sinsr_mist_er   --export=ALL,STAIN=ER   hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_her2 --export=ALL,STAIN=HER2 hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_ki67 --export=ALL,STAIN=Ki67 hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_pr   --export=ALL,STAIN=PR   hpc/train_mist.sh
+## 10. Running
 
-# Inference (after training)
-sbatch hpc/infer_bci.sh
-sbatch hpc/infer_mist.sh
-
-# Evaluation (after inference)
-sbatch hpc/eval_bci.sh
-sbatch hpc/eval_mist.sh
-```
-
-Each MIST stain runs as a separate job. All four can run simultaneously if GPUs are available.
+**Cluster** — see `hpc/INSTRUCTIONS.md` for all sbatch commands (training, inference, evaluation).
 
 **Local single GPU:**
 ```bash
 CUDA_VISIBLE_DEVICES=0 python main_distill.py --cfg_path configs/virtualstaining_bci.yaml --save_dir ./outputs/bci_run
+```
+
+---
+
+## 11. Inference
+
+`inference.py` takes a folder of HE images and writes predicted IHC images to an output folder. It always uses a sliding window — there is no full-image mode.
+
+### Arguments
+
+| Argument | Default | Description |
+|---|---|---|
+| `-i` | required | Input folder of HE images |
+| `-o` | required | Output folder for predicted IHC images |
+| `-c` / `--config` | required | YAML config path (e.g. `configs/virtualstaining_bci.yaml`) |
+| `--ckpt` | required | Checkpoint path (`ema_best.pth` or `ema_model_last.pth`) |
+| `--scale` | `4` | Scale factor — must be `1` for virtual staining (1:1 resolution) |
+| `--one_step` | flag | Single-step distilled inference; required for the trained student model |
+| `--chop_size` | `512` | Sliding window patch size in pixels; choices: `256`, `512` |
+| `--seed` | `12345` | Random seed |
+| `--ddim` | flag | Use DDIM sampling instead of DDPM |
+
+### Sliding window
+
+| `--chop_size` | Stride | Overlap |
+|---|---|---|
+| `256` | `224` | 32 px |
+| `512` | `448` | 64 px |
+
+### Current configuration
+
+Both `run_infer_bci.sh` and `run_infer_mist.sh` use `--chop_size 256`:
+
+```bash
+python3 inference.py \
+    -c configs/virtualstaining_bci.yaml \
+    --ckpt path/to/ema_best.pth \
+    -i <HE_test_folder> \
+    -o <output_folder> \
+    --scale 1 \
+    --one_step \
+    --chop_size 256
+```
+
+`--scale 1` is required: the original SinSR default is 4× super-resolution; without this the output dimensions would be wrong.
+`--one_step` is required: the distilled student model predicts directly in a single denoising step.
+`--chop_size 256` overrides the default of 512. To use 512×512 patches instead, change `--chop_size 256` to `--chop_size 512` in `hpc/infer/run_infer_bci.sh` and `hpc/infer/run_infer_mist.sh`.
+
+### Output locations
+
+Inference output folders are written to `$GRP_SCRATCH/diffusion-predictions/sinsr/` where `GRP_SCRATCH=/scratch/antwerpen/grp/ap_invilab_td_thesis`. The folder name is controlled by `RUN_SUFFIX` (default: `chop256`):
+
+| Run | Output folder |
+|---|---|
+| BCI | `$GRP_SCRATCH/diffusion-predictions/sinsr/bci_chop256/` |
+| MIST ER | `$GRP_SCRATCH/diffusion-predictions/sinsr/mist_er_chop256/` |
+| MIST HER2 | `$GRP_SCRATCH/diffusion-predictions/sinsr/mist_her2_chop256/` |
+| MIST Ki67 | `$GRP_SCRATCH/diffusion-predictions/sinsr/mist_ki67_chop256/` |
+| MIST PR | `$GRP_SCRATCH/diffusion-predictions/sinsr/mist_pr_chop256/` |
+
+To run with a different setting and save to a new folder without overwriting the default results, pass `RUN_SUFFIX` at submission time. Use the same value for both inference and eval:
+
+```bash
+sbatch --export=ALL,RUN_SUFFIX=chop512           hpc/infer/infer_bci.sh
+sbatch --export=ALL,RUN_SUFFIX=chop512           hpc/eval/eval_bci.sh
+
+sbatch --export=ALL,STAIN=ER,RUN_SUFFIX=chop512  hpc/infer/infer_mist.sh
+sbatch --export=ALL,RUN_SUFFIX=chop512           hpc/eval/eval_mist.sh
+```
+
+---
+
+## 12. Current Status
+
+| Stage | Status | Notes |
+|---|---|---|
+| Training — BCI | Complete | `ema_best.pth` saved under `checkpoints/bci_run/` |
+| Training — MIST ER / HER2 / Ki67 / PR | Complete | `ema_best.pth` saved for each stain |
+| Inference — BCI | Complete | `RUN_SUFFIX=chop256` (`--chop_size 256`) |
+| Inference — MIST | Complete | `RUN_SUFFIX=chop256` (`--chop_size 256`) for all four stains |
+| Inference — chop512 / full-image | Not run | Planned to compare patch visibility against chop256, as done for SR3; not attempted due to time |
+| Evaluation — BCI / MIST | Failed | See Issues section in `hpc/INSTRUCTIONS.md` |
+
+The chop256 inference setting was chosen to compare patch-level visibility across different crop sizes (256, 512, full-image), mirroring the SR3 evaluation approach. Only chop256 was completed before time ran out.
+
+---
+
+## 13. Environment
+
+This section is for local development only. On the cluster, the container handles the environment.
+
+- Python 3.9
+- PyTorch 2.1.2 + CUDA 12.1
+
+```bash
+pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements_frozen.txt
 ```

@@ -1,4 +1,4 @@
-# SinSR — Cluster Execution Plan
+# SinSR — Cluster Instructions
 
 Complete reference for running SinSR on VSC Tier 2 Antwerp.
 All scripts live in `hpc/` inside this repo.
@@ -6,7 +6,7 @@ Run all commands from the cluster login node unless stated otherwise. You can al
 
 ## Script inventory
 
-All scripts live in `hpc/` inside this repo. `setup_project.sh` and `clone_repo.sh` also have copies in home directory `~/` on the cluster — they must exist before the repo is cloned. The repo is the source of truth; if you update them, copy the new version to cluster.
+`setup_project.sh` and `clone_repo.sh` also have copies in home directory `~/` on the cluster — they must exist before the repo is cloned. The repo is the source of truth; if you update them, copy the new version to cluster.
 
 | Script | Type | What it does |
 |---|---|---|
@@ -17,7 +17,11 @@ All scripts live in `hpc/` inside this repo. `setup_project.sh` and `clone_repo.
 | `train_mist.sh` | sbatch | Trains on MIST stains (Apptainer container) |
 | `run_sinsr_mist.sh` | bash | Runs inside the container — called by `train_mist.sh` |
 | `infer_bci.sh` | sbatch | Runs inference on BCI test set |
-| `infer_mist.sh` | sbatch | Runs inference on all four MIST stains sequentially |
+| `run_infer_bci.sh` | bash | Runs inside the container — called by `infer_bci.sh` |
+| `infer_mist.sh` | sbatch | Runs inference on one MIST stain per job; STAIN = ER \| HER2 \| Ki67 \| PR |
+| `run_infer_mist.sh` | bash | Runs inside the container — called by `infer_mist.sh` |
+| `eval_bci.sh` | sbatch | Evaluates BCI predictions against ground truth |
+| `eval_mist.sh` | sbatch | Evaluates all four MIST stain predictions against ground truth |
 
 ---
 
@@ -66,6 +70,8 @@ MIST.sqsh root:
 
 Upload the archives to the cluster using a file transfer tool (Cyberduck, FileZilla, WinSCP, scp, rsync):
 - Destination: `$VSC_SCRATCH/datasets/BCI.sqsh` and `$VSC_SCRATCH/datasets/MIST.sqsh`
+
+where `VSC_SCRATCH=/scratch/antwerpen/212/vsc21211` (per-user scratch).
 
 Verify:
 
@@ -147,7 +153,7 @@ val_freq: 269
 Also set `--time=00:30:00` in `train_bci.sh`. Then submit:
 
 ```bash
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train_bci.sh
+sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train/train_bci.sh
 ```
 
 Pass criteria:
@@ -170,7 +176,7 @@ val_freq: 65
 Also set `--time=00:30:00` in `train_mist.sh`. Then submit:
 
 ```bash
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train_mist.sh
+sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/train/train_mist.sh
 ```
 
 Pass criteria: same as BCI, but check `$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/`.
@@ -181,58 +187,135 @@ After both smoke tests pass, restore all config values and `--time` before full 
 
 ### 3. Full training (sbatch)
 
-Restore config values on the cluster before submitting:
+After the smoke tests pass, restore all config values in the cluster-side copies
+(`configs/virtualstaining_bci.yaml` and all four `configs/virtualstaining_mist_*.yaml`):
 
-**BCI** (`configs/virtualstaining_bci.yaml`):
 ```yaml
-iterations: 24400
-milestones: [244, 24400]
-save_freq: 24400
-val_freq: 244
+iterations: 45000
+milestones: [5000, 500000]
+save_freq: 2440
+val_freq: 3000
 ```
 
-**MIST** (all four stain configs):
-```yaml
-iterations: 6500
-milestones: [65, 6500]
-save_freq: 6500
-val_freq: 65
-```
-
-`save_freq` is set to the total iterations so checkpoints are only written once at the end — this avoids NFS write failures during training. `val_freq` is set to one epoch so the full convergence curve is captured in the log.
-
-Restore `--time=20:00:00` in both `train_bci.sh` and `train_mist.sh`.
+These are the committed values. The smoke test temporarily overrides them; this step
+restores them. All four MIST configs use the same values as BCI.
 
 Submit BCI and all four MIST stains as separate jobs — they can run in parallel if GPUs are available:
 
 ```bash
 cd $VSC_DATA/projects/sinsr/code/SinSR
 
-sbatch hpc/train_bci.sh
+sbatch hpc/train/train_bci.sh
 
-sbatch --job-name=sinsr_mist_er   --export=ALL,STAIN=ER   hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_her2 --export=ALL,STAIN=HER2 hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_ki67 --export=ALL,STAIN=Ki67 hpc/train_mist.sh
-sbatch --job-name=sinsr_mist_pr   --export=ALL,STAIN=PR   hpc/train_mist.sh
+sbatch --job-name=sinsr_mist_er   --export=ALL,STAIN=ER   hpc/train/train_mist.sh
+sbatch --job-name=sinsr_mist_her2 --export=ALL,STAIN=HER2 hpc/train/train_mist.sh
+sbatch --job-name=sinsr_mist_ki67 --export=ALL,STAIN=Ki67 hpc/train/train_mist.sh
+sbatch --job-name=sinsr_mist_pr   --export=ALL,STAIN=PR   hpc/train/train_mist.sh
 ```
 
 ---
 
 ### 4. Inference (sbatch)
 
-Run after training completes. Scripts automatically pick the most recent training run and its highest-iteration EMA checkpoint.
+Run after training completes. Scripts automatically find `ema_best.pth` (the best validation LPIPS checkpoint) by modification time, with fallback to `ema_model_last.pth` if no best checkpoint exists.
 
 ```bash
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/infer_bci.sh
-sbatch $VSC_DATA/projects/sinsr/code/SinSR/hpc/infer_mist.sh
+cd $VSC_DATA/projects/sinsr/code/SinSR
+
+sbatch hpc/infer/infer_bci.sh
+
+sbatch --job-name=sinsr_infer_mist_er   --export=ALL,STAIN=ER   hpc/infer/infer_mist.sh
+sbatch --job-name=sinsr_infer_mist_her2 --export=ALL,STAIN=HER2 hpc/infer/infer_mist.sh
+sbatch --job-name=sinsr_infer_mist_ki67 --export=ALL,STAIN=Ki67 hpc/infer/infer_mist.sh
+sbatch --job-name=sinsr_infer_mist_pr   --export=ALL,STAIN=PR   hpc/infer/infer_mist.sh
 ```
 
-Verify output:
+For output folder naming and `RUN_SUFFIX` details, see `DOCUMENTATION.md` section 11.
+
+Verify output (replace GRP_SCRATCH with the actual path):
 
 ```bash
-find $VSC_DATA/projects/sinsr/outputs/results/bci_test -name "*.png" | wc -l
-find $VSC_DATA/projects/sinsr/outputs/results/mist_er_test -name "*.png" | wc -l
+GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
+find "$GRP_SCRATCH/diffusion-predictions/sinsr/bci_chop256"      -name "*.png" | wc -l
+find "$GRP_SCRATCH/diffusion-predictions/sinsr/mist_er_chop256"  -name "*.png" | wc -l
 ```
+
+---
+
+### 5. Evaluation (sbatch)
+
+Run after inference completes. The eval scripts use the shared `evaluate_nvidia.sif`
+container from the evaluate repo. This container must be built once and its weights
+pre-downloaded before any eval job runs.
+
+**One-time evaluate container setup**
+
+Follow the instructions in `evaluate/hpc_jobs/cluster_plan_container.md` (in the
+evaluate repo). In brief:
+
+1. Build the container locally:
+   ```bash
+   cd ~/projects/evaluate/hpc_jobs
+   sudo APPTAINER_TMPDIR=$HOME/apptainer_tmp APPTAINER_CACHEDIR=$HOME/apptainer_cache \
+       apptainer build evaluate_nvidia.sif evaluate_nvidia.def
+   ```
+
+2. Upload to the cluster:
+   ```bash
+   rsync -avz --progress evaluate_nvidia.sif \
+       vsc21211@login.hpc.uantwerpen.be:$VSC_SCRATCH/containers/evaluate_nvidia.sif
+   ```
+
+3. Pre-download LPIPS and Cellpose weights on the login node (no internet on compute nodes):
+   ```bash
+   module purge
+   module load calcua/2025a
+   apptainer exec --nv $VSC_SCRATCH/containers/evaluate_nvidia.sif python -c "
+   import lpips; lpips.LPIPS(net='alex'); lpips.LPIPS(net='vgg')
+   from cellpose import models; models.CellposeModel(pretrained_model='cpsam')
+   print('Weights cached.')
+   "
+   ```
+
+**Submit eval jobs**
+
+```bash
+cd $VSC_DATA/projects/sinsr/code/SinSR
+
+sbatch hpc/eval/eval_bci.sh
+sbatch hpc/eval/eval_mist.sh
+```
+
+Results are appended to `$VSC_DATA/benchmark_results.csv`.
+
+---
+
+### 6. Resuming Training
+
+If training is interrupted (time limit, node failure, manual cancellation), resume from the last saved checkpoint. The trainer saves a single overwriting checkpoint `ckpts/model_last.pth` every `save_freq` iterations.
+
+Find the timestamped run directory on the login node:
+
+```bash
+ls $VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/
+```
+
+Resubmit with `RESUME` pointing to `model_last.pth` in that directory:
+
+```bash
+sbatch --job-name=sinsr_mist_er \
+  --export=ALL,STAIN=ER,RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/2026-05-04-14-19/ckpts/model_last.pth" \
+  hpc/train/train_mist.sh
+```
+
+For BCI:
+
+```bash
+sbatch --export=ALL,RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run/2026-05-04-14-23/ckpts/model_last.pth" \
+  hpc/train/train_bci.sh
+```
+
+The `RESUME` path must point to `ckpts/model_last.pth` inside the timestamped run directory — not the EMA checkpoint. Training continues from that iteration and saves into the same timestamped directory.
 
 ---
 
@@ -267,6 +350,8 @@ find $VSC_DATA/projects/sinsr/outputs/checkpoints -name "*.pth" | sort
 | Problem | Cause | Fix |
 |---|---|---|
 | `Disk quota exceeded` when creating symlinks | Scratch inode limit (~48k symlinks exceeded quota) | Do not create symlinks — configs already point directly to source dataset paths |
-| `RuntimeError: File ... cannot be opened` when saving checkpoint | Transient NFS write error on `$VSC_DATA` | Set `save_freq` to total iterations so checkpoints are only written once at the end |
+| `RuntimeError: File ... cannot be opened` when saving checkpoint | Transient NFS write error on `$VSC_DATA` | Retry the job — the error is transient. If it recurs consistently, reduce `save_freq` to write checkpoints less often |
 | `destination .../datasets/BCI doesn't exist in container` | SquashFS mount point directory missing | The training scripts create it automatically with `mkdir -p` before the apptainer call |
 | `RuntimeError: Input type (Half) and bias type (float)` during validation | fp16 bug in the validation code path | Set all three `use_fp16: False` in the config: `model.params`, `autoencoder`, and `train` |
+| `AttributeError: 'TrainerDistillDifIR' object has no attribute 'loss_mean'` on resumed run | `loss_mean` was only initialized when `current_iters % log_freq == 1`; resumed runs start mid-cycle so the condition is never met before the first access | Fixed in `trainer.py` — `not hasattr(self, 'loss_mean')` guard added to the initialization condition |
+| `FATAL: container creation failed: image driver squashfuse_ll instance exited` in eval job | `evaluate_nvidia.sif` does not include the `squashfuse_ll` FUSE driver, so the `image-src=/` sqsh bind mount fails | Evaluation not yet completed — this issue is unresolved |
