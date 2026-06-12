@@ -13,6 +13,8 @@
 
 # infer_bci.sh — BCI test inference. Submit after train_bci.sh completes.
 # Automatically finds ema_best.pth (best validation LPIPS) by modification time; falls back to ema_model_last.pth.
+# Output folder: diffusion-predictions/sinsr/bci_<RUN_SUFFIX> (default: bci_chop256).
+# Override at submission: sbatch --export=ALL,RUN_SUFFIX=chop512 hpc/infer/infer_bci.sh
 
 set -euo pipefail
 
@@ -25,7 +27,7 @@ GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
 export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/bci_${RUN_SUFFIX}"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
-RUN_SCRIPT="$REPO_DIR/hpc/run_infer_bci.sh"
+RUN_SCRIPT="$REPO_DIR/hpc/infer/run_infer_bci.sh"
 
 # =========================================================
 # ENVIRONMENT

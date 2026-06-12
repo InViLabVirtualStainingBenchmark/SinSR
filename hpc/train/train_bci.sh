@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=sinsr_mist
+#SBATCH --job-name=sinsr_bci
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -8,8 +8,8 @@
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/%x.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21211/projects/sinsr/logs/train_bci.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21211/projects/sinsr/logs/train_bci.%j.err
 
 set -euo pipefail
 
@@ -18,26 +18,17 @@ set -euo pipefail
 # =========================================================
 
 export REPO_DIR="$VSC_DATA/projects/sinsr/code/SinSR"
+export CONFIG="$REPO_DIR/configs/virtualstaining_bci.yaml"
+export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run"
 export LOG_DIR="$VSC_DATA/projects/sinsr/logs"
 
-CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
-RUN_SCRIPT="$REPO_DIR/hpc/run_sinsr_mist.sh"
-GRP_SCRATCH="/scratch/antwerpen/grp/ap_invilab_td_thesis"
-
-# Stain to train: ER | HER2 | Ki67 | PR
-# Override at submission with: sbatch --export=ALL,STAIN=HER2 train_mist.sh
-: "${STAIN:=ER}"
-
-stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
-
-export STAIN
-export CONFIG="$REPO_DIR/configs/virtualstaining_mist_${stain_lower}.yaml"
-export SAVE_DIR="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_${stain_lower}_run"
-
 # Set to a checkpoint .pth path to resume, e.g.:
-#   export RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/mist_er_run/2026-05-04-14-19/ckpts/model_65.pth"
+#   export RESUME="$VSC_DATA/projects/sinsr/outputs/checkpoints/bci_run/2026-05-04-14-23/ckpts/model_5124.pth"
 # Leave empty for a fresh run.
 export RESUME="${RESUME:-}"
+
+CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
+RUN_SCRIPT="$REPO_DIR/hpc/train/run_sinsr_bci.sh"
 
 # =========================================================
 # ENVIRONMENT
@@ -58,11 +49,11 @@ fi
 echo "  $CONTAINER"
 
 echo "=== Checking dataset ==="
-if [ ! -f "$GRP_SCRATCH/datasets/MIST/MIST.sqsh" ]; then
-    echo "ERROR: MIST SquashFS archive not found: $GRP_SCRATCH/datasets/MIST/MIST.sqsh"
+if [ ! -f "$VSC_SCRATCH/datasets/BCI.sqsh" ]; then
+    echo "ERROR: BCI SquashFS archive not found: $VSC_SCRATCH/datasets/BCI.sqsh"
     exit 1
 fi
-echo "  MIST.sqsh : $(du -h "$GRP_SCRATCH/datasets/MIST/MIST.sqsh" | cut -f1)"
+echo "  BCI.sqsh : $(du -h "$VSC_SCRATCH/datasets/BCI.sqsh" | cut -f1)"
 
 echo "=== Checking weights ==="
 if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || \
@@ -71,23 +62,14 @@ if [ ! -f "$REPO_DIR/weights/resshift_realsrx4_s15_v1.pth" ] || \
     exit 1
 fi
 
-echo "=== Stain: $STAIN ==="
-if [ ! -f "$CONFIG" ]; then
-    echo "ERROR: Config not found at $CONFIG"
-    exit 1
-fi
-
 # =========================================================
 # RUN
 # =========================================================
 
-mkdir -p "$GRP_SCRATCH/datasets/MIST"
+mkdir -p "$VSC_SCRATCH/datasets/BCI"
 
 srun apptainer exec --nv \
-    -B "$GRP_SCRATCH/datasets/MIST/MIST.sqsh:$GRP_SCRATCH/datasets/MIST:image-src=/" \
+    -B "$VSC_SCRATCH/datasets/BCI.sqsh:$VSC_SCRATCH/datasets/BCI:image-src=/" \
     -B "$VSC_DATA:$VSC_DATA" \
     "$CONTAINER" \
     bash "$RUN_SCRIPT"
-
-echo ""
-echo "MIST $STAIN training complete."

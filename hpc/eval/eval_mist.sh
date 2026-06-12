@@ -13,6 +13,8 @@
 
 # eval_mist.sh — Evaluate SinSR predictions on all four MIST stains.
 # Submit after infer_mist.sh completes.
+# Override output folder at submission: sbatch --export=ALL,RUN_SUFFIX=chop512 hpc/eval/eval_mist.sh
+# RUN_SUFFIX must match the value used for infer_mist.sh (default: chop256).
 
 set -euo pipefail
 

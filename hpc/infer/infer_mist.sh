@@ -14,6 +14,8 @@
 # infer_mist.sh — MIST inference for SinSR. Submit after train_mist.sh completes.
 # Override stain at submission: sbatch --export=ALL,STAIN=HER2 infer_mist.sh
 # Automatically picks ema_best.pth (or ema_model_last.pth) from the most recent training run.
+# Output folder: diffusion-predictions/sinsr/mist_<stain>_<RUN_SUFFIX> (default: mist_er_chop256, etc.).
+# Override at submission: sbatch --export=ALL,STAIN=ER,RUN_SUFFIX=chop512 hpc/infer/infer_mist.sh
 
 set -euo pipefail
 
@@ -31,7 +33,7 @@ stain_lower=$(echo "$STAIN" | tr '[:upper:]' '[:lower:]')
 export OUT_DIR="$GRP_SCRATCH/diffusion-predictions/sinsr/mist_${stain_lower}_${RUN_SUFFIX}"
 
 CONTAINER="$VSC_SCRATCH/containers/sinsr_nvidia.sif"
-RUN_SCRIPT="$REPO_DIR/hpc/run_infer_mist.sh"
+RUN_SCRIPT="$REPO_DIR/hpc/infer/run_infer_mist.sh"
 
 # =========================================================
 # ENVIRONMENT

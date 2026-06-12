@@ -13,6 +13,8 @@
 
 # eval_bci.sh — Evaluate SinSR predictions on BCI test set.
 # Submit after infer_bci.sh completes.
+# Override output folder at submission: sbatch --export=ALL,RUN_SUFFIX=chop512 hpc/eval/eval_bci.sh
+# RUN_SUFFIX must match the value used for infer_bci.sh (default: chop256).
 
 set -euo pipefail
 
